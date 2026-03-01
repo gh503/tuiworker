@@ -3,6 +3,8 @@ mod event;
 mod ui;
 mod models;
 mod storage;
+mod terminal;
+mod terminal_manager;
 
 use app::App;
 use crossterm::{
@@ -68,9 +70,13 @@ fn run_app<B: ratatui::backend::Backend>(
     mut last_tick: Instant,
 ) -> Result<(), Box<dyn std::error::Error>> {
     loop {
-        // 绘制 UI
-        terminal.draw(|f| ui::draw(f, app))?;
+        // Update terminal output (if in terminal mode)
+        if app.in_terminal_mode {
+            app.update_current_terminal_output();
+        }
 
+        // Draw UI
+        terminal.draw(|f| ui::draw(f, app))?;
         // 超时时间 = 下一次 tick 的时间
         let timeout = tick_rate
             .checked_sub(last_tick.elapsed())

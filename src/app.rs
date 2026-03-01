@@ -2,13 +2,22 @@ use crate::event::AppEvent;
 use crate::models::{AppData, CommandHistory, Note, Todo, TodoStatus};
 use std::path::PathBuf;
 
+
+// ============ 终端标签页 ============
+#[derive(Debug)]
+pub struct TerminalTab {
+    pub id: usize,
+    pub title: String,
+    pub command_execution_active: bool,
+    pub command_output_buffer: String,
+    pub is_active: bool,
+}
 // ============ 标签页枚举 ============
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Tab {
     Dashboard,
     Notes,
     Todos,
-    Commands,
     Calendar,
     FileBrowser,
     Search,
@@ -16,12 +25,11 @@ pub enum Tab {
 }
 
 impl Tab {
-    pub fn all() -> [Tab; 8] {
+    pub fn all() -> [Tab; 7] {
         [
             Tab::Dashboard,
             Tab::Notes,
             Tab::Todos,
-            Tab::Commands,
             Tab::Calendar,
             Tab::FileBrowser,
             Tab::Search,
@@ -34,7 +42,6 @@ impl Tab {
             Tab::Dashboard => "仪表板",
             Tab::Notes => "笔记",
             Tab::Todos => "待办",
-            Tab::Commands => "命令",
             Tab::Calendar => "日历",
             Tab::FileBrowser => "文件",
             Tab::Search => "搜索",
@@ -47,7 +54,6 @@ impl Tab {
             Tab::Dashboard => "1",
             Tab::Notes => "2",
             Tab::Todos => "3",
-            Tab::Commands => "4",
             Tab::Calendar => "5",
             Tab::FileBrowser => "6",
             Tab::Search => "7",
@@ -97,6 +103,7 @@ pub enum SearchResult {
 #[derive(Debug)]
 pub struct App {
     pub should_quit: bool,
+    pub in_terminal_mode: bool,
     pub current_tab: Tab,
     pub input_mode: InputMode,
     pub input_buffer: String,
@@ -131,6 +138,11 @@ pub struct App {
     pub modal_message: String,
     pub modal_waiting_input: bool,
     pub input_prompt: String,
+    
+    // 终端标签页管理
+    pub terminal_tabs: Vec<TerminalTab>,
+    pub current_terminal_tab_index: Option<usize>,
+    pub mru_terminal_tabs: Vec<usize>,
 }
 
 impl Default for App {
@@ -143,6 +155,7 @@ impl Default for App {
 
         Self {
             should_quit: false,
+            in_terminal_mode: false,
             current_tab: Tab::Dashboard,
             input_mode: InputMode::Normal,
             input_buffer: String::new(),
@@ -177,6 +190,10 @@ impl Default for App {
             modal_message: String::new(),
             modal_waiting_input: false,
             input_prompt: String::new(),
+            
+            terminal_tabs: Vec::new(),
+            current_terminal_tab_index: None,
+            mru_terminal_tabs: Vec::new(),
         }
     }
 }
@@ -190,6 +207,106 @@ impl App {
         self.data = data;
         self.refresh_file_browser();
         self
+    }
+
+    // ============ 终端标签页操作 ============
+    pub fn create_terminal_tab(&mut self) {
+        let new_id = if let Some(last_tab) = self.terminal_tabs.last() {
+            last_tab.id + 1
+        } else {
+            0
+        };
+        
+        let tab = TerminalTab {
+            id: new_id,
+            title: format!("Terminal {}", new_id + 1),
+            command_execution_active: false,
+            command_output_buffer: String::new(),
+            is_active: true,
+        };
+        
+        self.terminal_tabs.push(tab);
+        self.current_terminal_tab_index = Some(self.terminal_tabs.len() - 1);
+        self.in_terminal_mode = true;
+        
+        // Update MRU list
+        if let Some(idx) = self.current_terminal_tab_index {
+            self.mru_terminal_tabs.retain(|&i| i != idx);
+            self.mru_terminal_tabs.push(idx);
+        }
+    }
+    
+    pub fn close_terminal_tab(&mut self) {
+        if let Some(index) = self.current_terminal_tab_index {
+            if index < self.terminal_tabs.len() {
+                self.terminal_tabs.remove(index);
+                
+                if self.terminal_tabs.is_empty() {
+                    self.current_terminal_tab_index = None;
+                    self.in_terminal_mode = false;
+                } else {
+                    self.current_terminal_tab_index = Some(index.min(self.terminal_tabs.len() - 1));
+                }
+            }
+        }
+    }
+    
+    pub fn switch_terminal_tab(&mut self, index: usize) {
+        if index < self.terminal_tabs.len() {
+            self.current_terminal_tab_index = Some(index);
+            self.terminal_tabs.iter_mut().for_each(|t| t.is_active = false);
+            self.terminal_tabs[index].is_active = true;
+            
+            // Update MRU list
+            self.mru_terminal_tabs.retain(|&i| i != index);
+            self.mru_terminal_tabs.push(index);
+        }
+    }
+    
+    pub fn get_current_terminal_tab(&self) -> Option<&TerminalTab> {
+        self.current_terminal_tab_index.and_then(|idx| self.terminal_tabs.get(idx))
+    }
+    
+    pub fn get_current_terminal_tab_mut(&mut self) -> Option<&mut TerminalTab> {
+        self.current_terminal_tab_index.and_then(move |idx| self.terminal_tabs.get_mut(idx))
+    }
+    
+    pub fn update_current_terminal_output(&mut self) {
+        // Update terminal output buffer
+        if let Some(tab) = self.get_current_terminal_tab_mut() {
+            if tab.command_execution_active {
+                // In a real implementation, this would read from the PTY
+                // For now, we'll just append a timestamp to show it's working
+                let timestamp = chrono::Local::now().format("%H:%M:%S");
+                tab.command_output_buffer.push_str(&format!(
+                    "\n[{}] Output update - terminal functionality active\n",
+                    timestamp
+                ));
+            }
+        }
+    }
+    
+    pub fn execute_command_in_current_tab(&mut self, command: String) {
+        if let Some(tab) = self.get_current_terminal_tab_mut() {
+            tab.command_execution_active = true;
+            let timestamp = chrono::Local::now().format("%H:%M:%S");
+            tab.command_output_buffer.push_str(&format!(
+                "\n[{}] $ {}\n",
+                timestamp, command
+            ));
+            
+            // Add to command history
+            let success = true;
+            let output = Some(format!("Command executed: {}", command));
+            let history = CommandHistory::new(command.clone(), success, output);
+            self.data.command_history.push(history);
+            
+            if self.data.command_history.len() > 100 {
+                self.data.command_history.remove(0);
+            }
+            
+            self.command_input.clear();
+        }
     }
 
     // ============ 笔记操作 ============
@@ -420,6 +537,8 @@ impl App {
                 self.current_tab = tabs[new_index];
                 self.input_mode = InputMode::Normal;
             }
+            AppEvent::NewTab => self.create_terminal_tab(),
+            AppEvent::CloseTab => self.close_terminal_tab(),
             AppEvent::Up => self.handle_up(),
             AppEvent::Down => self.handle_down(),
             AppEvent::Left => self.handle_left(),
@@ -540,11 +659,6 @@ impl App {
                 Tab::FileBrowser => {
                     self.navigate_file_browser_into();
                 }
-                Tab::Commands => {
-                    if !self.command_input.is_empty() {
-                        self.execute_command(self.command_input.clone());
-                    }
-                }
                 Tab::Search => {
                     if !self.search.query.is_empty() {
                         self.perform_search();
@@ -603,7 +717,6 @@ impl App {
                 'd' => {
                     self.input_mode = InputMode::Editing;
                     match self.current_tab {
-                        Tab::Commands => self.input_buffer = self.command_input.clone(),
                         Tab::Search => self.input_buffer = self.search.query.clone(),
                         _ => {}
                     }

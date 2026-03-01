@@ -5,6 +5,8 @@ pub enum AppEvent {
     Quit,
     TabNext,
     TabPrevious,
+    NewTab,
+    CloseTab,
     Up,
     Down,
     Left,
@@ -51,6 +53,8 @@ impl AppEvent {
             KeyCode::Esc => AppEvent::Esc,
             KeyCode::Backspace => AppEvent::Backspace,
             KeyCode::Delete => AppEvent::Delete,
+            KeyCode::Char('t') | KeyCode::Char('T') => AppEvent::NewTab,
+            KeyCode::Char('w') | KeyCode::Char('W') => AppEvent::CloseTab,
             KeyCode::Char(c) => AppEvent::Char(c),
             _ => AppEvent::Other(key_event),
         }
