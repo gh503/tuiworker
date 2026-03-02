@@ -570,6 +570,8 @@ impl App {
                 };
                 self.current_tab = tabs[new_index];
                 self.input_mode = InputMode::Normal;
+                // Update in_terminal_mode based on current tab
+                self.in_terminal_mode = self.current_tab == Tab::Commands && !self.terminal_tabs.is_empty();
             }
             AppEvent::NewTab => self.create_terminal_tab(),
             AppEvent::CloseTab => self.close_terminal_tab(),

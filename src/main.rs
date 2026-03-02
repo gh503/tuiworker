@@ -1,24 +1,24 @@
 mod app;
 mod event;
-mod ui;
 mod models;
 mod storage;
 mod terminal;
 mod terminal_manager;
+mod ui;
 
 use app::App;
 use crossterm::{
-    event::{DisableMouseCapture, EnableMouseCapture, read, Event},
+    event::{read, DisableMouseCapture, EnableMouseCapture, Event},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use event::AppEvent;
 use ratatui::{backend::CrosstermBackend, Terminal};
-use storage::Storage;
 use std::{
     io,
     time::{Duration, Instant},
 };
+use storage::Storage;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 初始化终端
@@ -41,9 +41,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 设置重绘时间间隔（120FPS）
     let tick_rate = Duration::from_millis(8);
     let last_tick = Instant::now();
+    let last_output_update = Instant::now();
+    let output_update_rate = Duration::from_millis(50); // 每50ms更新一次终端输出
 
     // 主循环
-    let result = run_app(&mut terminal, &mut app, &storage, tick_rate, last_tick);
+    let result = run_app(
+        &mut terminal,
+        &mut app,
+        &storage,
+        tick_rate,
+        output_update_rate,
+        last_tick,
+        last_output_update,
+    );
 
     // 保存数据
     if let Err(e) = storage.save(&app.data) {
@@ -67,16 +77,22 @@ fn run_app<B: ratatui::backend::Backend>(
     app: &mut App,
     storage: &Storage,
     tick_rate: Duration,
+    output_update_rate: Duration,
     mut last_tick: Instant,
+    mut last_output_update: Instant,
 ) -> Result<(), Box<dyn std::error::Error>> {
     loop {
-        // Update terminal output (if in terminal mode)
-        if app.in_terminal_mode {
+        // Update terminal output periodically (only when in Commands tab)
+        if app.current_tab == app::Tab::Commands
+            && last_output_update.elapsed() >= output_update_rate
+        {
             app.update_current_terminal_output();
+            last_output_update = Instant::now();
         }
 
         // Draw UI
         terminal.draw(|f| ui::draw(f, app))?;
+
         // 超时时间 = 下一次 tick 的时间
         let timeout = tick_rate
             .checked_sub(last_tick.elapsed())

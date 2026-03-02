@@ -62,7 +62,11 @@ impl TerminalType {
                 return "sh".to_string();
                 #[cfg(target_os = "linux")]
                 return "bash".to_string();
-                #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+                #[cfg(not(any(
+                    target_os = "windows",
+                    target_os = "macos",
+                    target_os = "linux"
+                )))]
                 return "sh".to_string();
             }
             _ => "sh".to_string(),
@@ -114,7 +118,7 @@ impl TerminalType {
             TerminalType::Auto
         }
     }
-    
+
     pub fn all() -> [TerminalType; 11] {
         [
             TerminalType::Auto,

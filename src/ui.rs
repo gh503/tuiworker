@@ -371,7 +371,11 @@ fn draw_commands(frame: &mut Frame<'_>, area: Rect, app: &App) {
         let output_text: Vec<Line> = tab.command_output_buffer.lines().map(Line::from).collect();
 
         let paragraph = Paragraph::new(output_text)
-            .block(Block::default().title(tab.title.as_str()).borders(Borders::ALL))
+            .block(
+                Block::default()
+                    .title(tab.title.as_str())
+                    .borders(Borders::ALL),
+            )
             .wrap(Wrap { trim: false });
 
         frame.render_widget(paragraph, chunks[1]);
