@@ -8,6 +8,7 @@ use ratatui::{
 };
 
 use crate::app::{App, InputMode, SearchResult, Tab};
+
 pub fn draw(frame: &mut Frame<'_>, app: &App) {
     let size = frame.area();
 
@@ -332,53 +333,56 @@ fn draw_todos(frame: &mut Frame<'_>, area: Rect, app: &App) {
 }
 
 fn draw_commands(frame: &mut Frame<'_>, area: Rect, app: &App) {
-    // 上部：命令输入
+    // 左侧：终端标签页列表
     let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Length(3), Constraint::Min(0)])
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Length(20), Constraint::Min(0)])
         .split(area);
 
-    let input_prompt = Line::from(vec![
-        Span::styled("$ ", Style::default().fg(Color::Green)),
-        Span::styled(&app.command_input, Style::default()),
-    ]);
-
-    let input_paragraph = Paragraph::new(input_prompt)
-        .block(Block::default().title("命令输入").borders(Borders::ALL))
-        .alignment(Alignment::Left);
-
-    frame.render_widget(input_paragraph, chunks[0]);
-
-    // 下部：命令历史
-    let history_items: Vec<ListItem> = app
-        .data
-        .command_history
+    let tab_items: Vec<ListItem> = app
+        .terminal_tabs
         .iter()
-        .rev()
-        .take(20)
-        .map(|history| {
-            let style = if history.success {
-                Style::default().fg(Color::Green)
+        .enumerate()
+        .map(|(i, tab)| {
+            let style = if tab.is_active {
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD)
             } else {
-                Style::default().fg(Color::Red)
+                Style::default().fg(Color::Gray)
             };
-
-            let time_str = history.executed_at.format("%H:%M:%S").to_string();
-            let text = format!("[{}] {}", time_str, history.command);
-            ListItem::new(text).style(style)
+            ListItem::new(tab.title.as_str()).style(style)
         })
         .collect();
 
-    let list = List::new(history_items)
+    let tab_list = List::new(tab_items)
         .block(
             Block::default()
-                .title("命令历史")
+                .title("终端标签")
                 .title_alignment(Alignment::Center)
                 .borders(Borders::ALL),
         )
         .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
 
-    frame.render_widget(list, chunks[1]);
+    frame.render_widget(tab_list, chunks[0]);
+
+    // 右侧：当前终端输出
+    if let Some(tab) = app.get_current_terminal_tab() {
+        let output_text: Vec<Line> = tab.command_output_buffer.lines().map(Line::from).collect();
+
+        let paragraph = Paragraph::new(output_text)
+            .block(Block::default().title(tab.title.as_str()).borders(Borders::ALL))
+            .wrap(Wrap { trim: false });
+
+        frame.render_widget(paragraph, chunks[1]);
+    } else {
+        let paragraph = Paragraph::new("没有打开的终端\n\n按 't' 创建新终端标签")
+            .block(Block::default().title("终端").borders(Borders::ALL))
+            .alignment(Alignment::Center)
+            .wrap(Wrap { trim: true });
+
+        frame.render_widget(paragraph, chunks[1]);
+    }
 }
 
 fn draw_calendar(frame: &mut Frame<'_>, area: Rect, app: &App) {
@@ -626,7 +630,7 @@ fn draw_status_bar(frame: &mut Frame<'_>, area: Rect, app: &App) {
             }
         }
         Tab::Commands => {
-            status_parts.push(format!("历史: {}", app.data.command_history.len()));
+            status_parts.push(format!("标签: {}", app.terminal_tabs.len()));
         }
         Tab::Search => {
             status_parts.push(format!("结果: {}", app.search.results.len()));
