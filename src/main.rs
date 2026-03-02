@@ -1,12 +1,14 @@
 mod app;
 mod event;
+mod ui;
 mod models;
 mod storage;
 mod terminal;
 mod terminal_manager;
-mod ui;
+mod logger;
 
 use app::App;
+use logger::init_logger;
 use crossterm::{
     event::{read, DisableMouseCapture, EnableMouseCapture, Event},
     execute,
@@ -21,16 +23,25 @@ use std::{
 use storage::Storage;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // 初始化日志系统
+    init_logger()?;
+    logger::log_info("Application starting...");
+
     // 初始化终端
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
+    logger::log_debug("Terminal initialized successfully");
 
     // 初始化存储
     let storage = Storage::new()?;
+    logger::log_debug("Storage initialized");
 
+    // 加载数据
+    let data = storage.load()?;
+    logger::log_info(&format!("Loaded {} notes, {} todos", data.notes.len(), data.todos.len()));
     // 加载数据
     let data = storage.load()?;
 

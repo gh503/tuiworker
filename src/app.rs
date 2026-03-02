@@ -1,9 +1,8 @@
 use crate::event::AppEvent;
 use crate::models::{AppData, CommandHistory, Note, Todo, TodoStatus};
 use crate::terminal_manager::PtySession;
+use crate::logger::{log_debug, log_error, log_info};
 use std::path::PathBuf;
-
-// ============ 终端标签页 ============
 #[derive(Debug)]
 pub struct TerminalTab {
     pub id: usize,
@@ -233,22 +232,26 @@ impl App {
 
     // ============ 终端标签页操作 ============
     pub fn create_terminal_tab(&mut self) {
+        log_info("Creating new terminal tab");
+        
         let new_id = if let Some(last_tab) = self.terminal_tabs.last() {
             last_tab.id + 1
         } else {
             0
         };
+        log_debug(&format!("New terminal tab ID: {}", new_id));
 
         let shell = if cfg!(target_os = "windows") {
             "powershell.exe".to_string()
         } else {
             "bash".to_string()
         };
+        log_info(&format!("Using shell: {}", shell));
 
         let tab = TerminalTab {
             id: new_id,
             title: format!("Terminal {}", new_id + 1),
-            shell,
+            shell: shell.clone(),
             pty_session: None,
             command_output_buffer: String::new(),
             is_active: true,
@@ -257,18 +260,27 @@ impl App {
         self.terminal_tabs.push(tab);
         self.current_terminal_tab_index = Some(self.terminal_tabs.len() - 1);
         self.in_terminal_mode = true;
+        log_debug(&format!("Terminal tab created, in_terminal_mode set to true. Total tabs: {}", self.terminal_tabs.len()));
 
         // Start PTY session for the new tab
+        log_debug("Starting PTY session for new terminal tab...");
         if let Some(tab) = self.get_current_terminal_tab_mut() {
             if let Err(e) = tab.start_pty() {
-                tab.command_output_buffer = format!("Failed to start PTY: {}\n", e);
+                let error_msg = format!("Failed to start PTY: {}\n", e);
+                log_error(&error_msg);
+                tab.command_output_buffer = error_msg;
+            } else {
+                log_info("PTY session started successfully");
             }
+        } else {
+            log_error("Failed to get current terminal tab mut reference");
         }
 
         // Update MRU list
         if let Some(idx) = self.current_terminal_tab_index {
             self.mru_terminal_tabs.retain(|&i| i != idx);
             self.mru_terminal_tabs.push(idx);
+            log_debug(&format!("Updated MRU list, current index: {}", idx));
         }
     }
 
