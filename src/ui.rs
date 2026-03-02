@@ -135,6 +135,7 @@ fn draw_main_content(frame: &mut Frame<'_>, area: Rect, app: &App) {
         Tab::FileBrowser => draw_file_browser(frame, area, app),
         Tab::Search => draw_search(frame, area, app),
         Tab::Settings => draw_settings(frame, area, app),
+        Tab::Logs => draw_logs(frame, area, app),
     }
 }
 
@@ -619,6 +620,62 @@ fn draw_settings(frame: &mut Frame<'_>, area: Rect, app: &App) {
 
     frame.render_widget(paragraph, area);
 }
+fn draw_logs(frame: &mut Frame<'_>, area: Rect, app: &App) {
+    // Get logs from buffer
+    let logs = &app.log_buffer;
+
+    if logs.is_empty() {
+        let paragraph = Paragraph::new(
+            "暂无日志\n\n日志将自动记录到 tuiworker.log 文件\n\n按 'c' 清空日志缓冲区"
+        )
+        .block(Block::default().title("日志").borders(Borders::ALL))
+        .alignment(Alignment::Center)
+        .wrap(Wrap { trim: true });
+        frame.render_widget(paragraph, area);
+        return;
+    }
+
+    // Show last 100 log lines
+    let log_lines: Vec<Line> = logs
+        .iter()
+        .rev()
+        .take(100)
+        .rev()
+        .map(|line| {
+            let (level, msg) = line.split_once("] ").unwrap_or(("INFO", line));
+            
+            let style = match level {
+                "ERROR" => Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                "WARN" => Style::default().fg(Color::Yellow),
+                "DEBUG" => Style::default().fg(Color::Gray),
+                _ => Style::default().fg(Color::Cyan),
+            };
+            
+            Line::from(vec![Span::styled(level, style), Span::raw(": "), Span::styled(msg, Style::default())])
+        })
+        .collect();
+
+    let header = Line::from(vec![
+        Span::styled(
+            format!("日志 (共 {} 条, 显示最近 100 条) - 按 'c' 清空", logs.len()),
+            Style::default().fg(Color::Yellow),
+        ),
+    ]);
+    
+    // Combine header and logs
+    let mut content = vec![header];
+    content.extend(log_lines);
+
+    let content_len = content.len();
+    let paragraph = Paragraph::new(content)
+        .block(Block::default().title("日志").borders(Borders::ALL))
+        .wrap(Wrap { trim: true })
+        .alignment(Alignment::Left)
+        .scroll((0, content_len as u16 - 2));
+    frame.render_widget(paragraph, area);
+}
+
+
 
 fn draw_status_bar(frame: &mut Frame<'_>, area: Rect, app: &App) {
     let mut status_parts = vec![format!("当前标签: {}", app.current_tab.name())];

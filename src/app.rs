@@ -1,7 +1,7 @@
 use crate::event::AppEvent;
 use crate::models::{AppData, CommandHistory, Note, Todo, TodoStatus};
 use crate::terminal_manager::PtySession;
-use crate::logger::{log_debug, log_error, log_info};
+use crate::logger::{get_log_buffer, log_debug, log_error, log_info};
 use std::path::PathBuf;
 #[derive(Debug)]
 pub struct TerminalTab {
@@ -36,6 +36,7 @@ pub enum Tab {
     Notes,
     Todos,
     Commands,
+    Logs,
     Calendar,
     FileBrowser,
     Search,
@@ -43,12 +44,13 @@ pub enum Tab {
 }
 
 impl Tab {
-    pub fn all() -> [Tab; 8] {
+    pub fn all() -> [Tab; 9] {
         [
             Tab::Dashboard,
             Tab::Notes,
             Tab::Todos,
             Tab::Commands,
+            Tab::Logs,
             Tab::Calendar,
             Tab::FileBrowser,
             Tab::Search,
@@ -62,13 +64,13 @@ impl Tab {
             Tab::Notes => "笔记",
             Tab::Todos => "待办",
             Tab::Commands => "终端",
+            Tab::Logs => "日志",
             Tab::Calendar => "日历",
             Tab::FileBrowser => "文件",
             Tab::Search => "搜索",
             Tab::Settings => "设置",
         }
     }
-
     pub fn shortcut(&self) -> &'static str {
         match self {
             Tab::Dashboard => "1",
@@ -79,6 +81,7 @@ impl Tab {
             Tab::FileBrowser => "6",
             Tab::Search => "7",
             Tab::Settings => "8",
+            Tab::Logs => "9",
         }
     }
 }
@@ -164,8 +167,10 @@ pub struct App {
     pub terminal_tabs: Vec<TerminalTab>,
     pub current_terminal_tab_index: Option<usize>,
     pub mru_terminal_tabs: Vec<usize>,
-}
 
+            // 日志缓冲区
+    pub log_buffer: Vec<String>,
+}
 impl Default for App {
     fn default() -> Self {
         let home_dir = std::env::var("HOME")
@@ -215,6 +220,8 @@ impl Default for App {
             terminal_tabs: Vec::new(),
             current_terminal_tab_index: None,
             mru_terminal_tabs: Vec::new(),
+
+            log_buffer: Vec::new(),
         }
     }
 }
@@ -799,5 +806,11 @@ impl App {
                 _ => {}
             }
         }
+    }
+
+    // ============ 日志操作 ============
+    // ============ 日志操作 ============
+    pub fn update_log_buffer(&mut self) {
+        self.log_buffer = get_log_buffer();
     }
 }
