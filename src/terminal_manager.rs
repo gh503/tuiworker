@@ -4,14 +4,15 @@ use std::io::{Read, Write};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::Duration;
 
 static TERMINAL_ID: AtomicUsize = AtomicUsize::new(0);
 
 pub struct PtySession {
     pub id: usize,
     pub shell: String,
-    pub output: Arc<Mutex<String>>,
-    pub is_running: bool,
+    output: Arc<Mutex<Vec<u8>>>,
+    is_running: bool,
     master: Option<Box<dyn MasterPty + Send>>,
     writer: Option<Box<dyn Write + Send>>,
     read_handle: Option<thread::JoinHandle<()>>,
@@ -23,23 +24,11 @@ impl PtySession {
         Self {
             id,
             shell,
-            output: Arc::new(Mutex::new(String::new())),
+            output: Arc::new(Mutex::new(Vec::new())),
             is_running: false,
             master: None,
             writer: None,
             read_handle: None,
-        }
-    }
-
-    /// 显示欢迎消息（不启动 PTY）
-    pub fn show_welcome(&self) {
-        let welcome = format!(
-            "=== TUI Worker Terminal ===\nShell: {}\n按 Enter 进入交互式终端\n\n",
-            self.shell
-        );
-        if let Ok(mut out) = self.output.lock() {
-            out.clear();
-            out.push_str(&welcome);
         }
     }
 
@@ -65,7 +54,8 @@ impl PtySession {
             if self.shell.ends_with("cmd.exe") || self.shell == "cmd" {
                 c.args(["/K"]);
             } else if self.shell.ends_with("powershell.exe") || self.shell == "powershell" {
-                c.args(["-NoLogo", "-NoProfile"]);
+                // PowerShell 参数：禁用 LOGO，禁用配置文件，设置输出为行缓冲
+                c.args(["-NoLogo", "-NoProfile", "-Command", "$OutputEncoding = [Console]::OutputEncoding = [Console]::InputEncoding = [System.Text.Encoding]::UTF8"]);
             }
             c
         } else {
@@ -77,31 +67,42 @@ impl PtySession {
             .spawn_command(cmd)
             .map_err(|e| format!("Failed to spawn shell: {}", e))?;
 
-        let mut master = pair.master;
+        let master = pair.master;
         let writer = master
             .take_writer()
             .map_err(|e| format!("Failed to get writer: {}", e))?;
 
         let output = self.output.clone();
 
-        let mut reader = master.try_clone_reader().map_err(|e| format!("Failed to get reader: {}", e))?;
+        let mut reader = master
+            .try_clone_reader()
+            .map_err(|e| format!("Failed to get reader: {}", e))?;
         let read_handle = thread::spawn(move || {
             let mut buffer = [0u8; 4096];
             loop {
                 match reader.read(&mut buffer) {
-                    Ok(0) => break,
+                    Ok(0) => {
+                        // Reader closed
+                        break;
+                    }
                     Ok(n) => {
-                        if let Ok(text) = String::from_utf8(buffer[..n].to_vec()) {
-                            if let Ok(mut out) = output.lock() {
-                                out.push_str(&text);
-                                if out.len() > 200000 {
-                                    let start = out.len() - 100000;
-                                    out.drain(..start);
-                                }
+                        if let Ok(mut out) = output.lock() {
+                            out.extend_from_slice(&buffer[..n]);
+                            // 限制缓冲区大小
+                            if out.len() > 500000 {
+                                let drain_amount = out.len() - 200000;
+                                out.drain(..drain_amount);
                             }
                         }
                     }
-                    Err(_) => break,
+                    Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {
+                        // Interrupted is not a fatal error, retry
+                        continue;
+                    }
+                    Err(_) => {
+                        // Other errors mean the reader is dead
+                        break;
+                    }
                 }
             }
         });
@@ -111,13 +112,26 @@ impl PtySession {
         self.read_handle = Some(read_handle);
         self.is_running = true;
 
+        // 给 shell 一些时间启动
+        std::thread::sleep(Duration::from_millis(100));
+
         Ok(())
     }
 
+    /// 发送字符到 PTY，并立即回显到本地输出
     pub fn send_char(&mut self, c: char) -> Result<(), String> {
         if !self.is_running {
             return Err("PTY session not running".to_string());
         }
+
+        // 立即回显到本地输出
+        if let Ok(mut out) = self.output.lock() {
+            let mut buf = [0u8; 4];
+            let encoded = c.encode_utf8(&mut buf);
+            out.extend_from_slice(encoded.as_bytes());
+        }
+
+        // 发送到 PTY
         if let Some(ref mut writer) = self.writer {
             let mut buf = [0u8; 4];
             let encoded = c.encode_utf8(&mut buf);
@@ -129,10 +143,18 @@ impl PtySession {
         Ok(())
     }
 
+    /// 发送 Enter 到 PTY，并添加换行符到本地输出
     pub fn send_enter(&mut self) -> Result<(), String> {
         if !self.is_running {
             return Err("PTY session not running".to_string());
         }
+
+        // 立即回显换行到本地输出
+        if let Ok(mut out) = self.output.lock() {
+            out.push(b'\n');
+        }
+
+        // 发送到 PTY
         if let Some(ref mut writer) = self.writer {
             writer
                 .write_all(b"\n")
@@ -142,13 +164,45 @@ impl PtySession {
         Ok(())
     }
 
+    /// 发送 Backspace 到 PTY，并从本地输出删除最后一个字符
     pub fn send_backspace(&mut self) -> Result<(), String> {
         if !self.is_running {
             return Err("PTY session not running".to_string());
         }
+
+        // 从本地输出删除最后一个字符（如果有的话）
+        if let Ok(mut out) = self.output.lock() {
+            // 删除最后一个 UTF-8 字符
+            if let Some((index, _)) = out.len().checked_sub(1).and_then(|i| {
+                if out.is_empty() {
+                    return None;
+                }
+                // 从最后一个字符向后搜索有效的 UTF-8 序列的开始
+                let mut pos = i;
+                while pos > 0 {
+                    let byte = out[pos];
+                    // UTF-8 字符的首字节：0xxxxxxx, 110xxxxx, 1110xxxx, 11110xxx
+                    if (byte & 0b11000000) != 0b10000000 {
+                        break;
+                    }
+                    pos -= 1;
+                }
+                Some((pos, i))
+            }) {
+                out.drain(index..);
+            }
+        }
+
+        // 发送到 PTY (发送 Backspace 控制字符)
         if let Some(ref mut writer) = self.writer {
+            // 在 Unix 系统上使用 DEL (0x7F)，在 Windows 上可能需要其他方式
+            let bs_byte = if cfg!(target_os = "windows") {
+                b'\x08' // Backspace
+            } else {
+                b'\x7f' // DEL
+            };
             writer
-                .write_all(b"\x7F")
+                .write_all(&[bs_byte])
                 .map_err(|e| format!("Write error: {}", e))?;
             writer.flush().map_err(|e| format!("Flush error: {}", e))?;
         }
@@ -162,9 +216,11 @@ impl PtySession {
         self.is_running = false;
     }
 
+    /// 获取输出为 UTF-8 字符串
     pub fn get_output(&self) -> String {
-        if let Ok(output) = self.output.lock() {
-            output.clone()
+        if let Ok(out) = self.output.lock() {
+            // 只取有效的 UTF-8 部分
+            String::from_utf8_lossy(&out).to_string()
         } else {
             String::new()
         }
