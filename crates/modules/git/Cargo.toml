@@ -1,0 +1,17 @@
+[package]
+name = "git"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+core = { path = "../../core" }
+ui = { path = "../../ui" }
+crossterm = { workspace = true }
+ratatui = { workspace = true }
+anyhow = { workspace = true }
+git2 = { version = "0.19", features = ["default"] }
+log = { workspace = true }
+dirs = { workspace = true }
+chrono = { workspace = true }

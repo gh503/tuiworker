@@ -1,0 +1,75 @@
+[general]
+# 日志级别: trace, debug, info, warn, error
+log_level = "info"
+
+# 是否记录日志到文件
+log_to_file = true
+
+# 日志文件路径（支持 ~ 展开）
+log_file = "~/.local/share/tui-workstation/logs/app.log"
+
+# 主题名称: default, dark, light
+theme = "default"
+
+[shortcuts]
+# 全局快捷键
+global_quit = "q"
+switch_tab_next = "Ctrl+Right"
+switch_tab_prev = "Ctrl+Left"
+show_help = "?"
+
+[modules]
+# 启用的模块列表
+enabled = ["filebrowser", "todo", "note", "diary", "terminal", "git"]
+
+[filebrowser]
+# 是否显示隐藏文件
+show_hidden = false
+
+# 排序方式: name, size, modified
+sort_by = "name"
+
+[todo]
+# 默认优先级: high, medium, low
+default_priority = "medium"
+
+[note]
+# 笔记目录
+notes_dir = "~/.local/share/tui-workstation/notes"
+
+[diary]
+# 日记目录
+diary_dir = "~/.local/share/tui-workstation/diary"
+
+[terminal]
+# 默认 shell: default, bash, zsh, powershell, cmd
+# "default" 使用系统默认 shell
+default_shell = "default"
+
+[git]
+# 默认编辑器: default, vim, nano, emacs
+default_editor = "default"
+
+[music]
+# 音乐目录
+music_dir = "~/Music"
+
+# 默认音量 (0.0 - 1.0)
+default_volume = 0.8
+
+[mail]
+# IMAP 服务器设置
+imap_server = "imap.example.com"
+imap_port = 993
+use_imaps = true
+
+# SMTP 服务器设置
+smtp_server = "smtp.example.com"
+smtp_port = 587
+use_smtps = false
+
+# 用户名（密码使用 keyring 存储）
+username = "your.email@example.com"
+
+[project]
+# 项目数据存储在 sled 数据库中

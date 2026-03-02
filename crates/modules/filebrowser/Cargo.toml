@@ -1,0 +1,19 @@
+[package]
+name = "filebrowser"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+core = { path = "../../core" }
+ui = { path = "../../ui" }
+storage = { path = "../../storage" }
+crossterm = { workspace = true }
+ratatui = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+anyhow = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+ignore = { workspace = true }
+opener = { workspace = true }

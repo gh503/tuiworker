@@ -1,0 +1,17 @@
+[package]
+name = "music"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+core = { path = "../../core" }
+ui = { path = "../../ui" }
+crossterm = { workspace = true }
+ratatui = { workspace = true }
+anyhow = { workspace = true }
+rodio = { workspace = true }
+log = { workspace = true }
+dirs = { workspace = true }
+parking_lot = { workspace = true }

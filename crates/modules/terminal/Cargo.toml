@@ -1,0 +1,15 @@
+[package]
+name = "terminal"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+core = { path = "../../core" }
+ui = { path = "../../ui" }
+crossterm = { workspace = true }
+ratatui = { workspace = true }
+anyhow = { workspace = true }
+portable-pty = "0.8"
+log = { workspace = true }
