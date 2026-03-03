@@ -2,7 +2,7 @@
 
 use crossterm::event::{Event as CrosstermEvent, KeyCode, KeyEvent};
 use ratatui::{
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span, Text},
     widgets::{Block, Borders, Gauge, Paragraph, Wrap},
@@ -10,19 +10,21 @@ use ratatui::{
 };
 
 use std::{
-    collections::VecDeque,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
     time::Duration,
 };
 
-use parking_lot::RwLock;
-use rodio::{OutputStream, OutputStreamHandle, Sink, Source};
+use rand::seq::SliceRandom;
+
+
+use rodio::{OutputStream, OutputStreamHandle, Sink};
+
+use ui::Theme;
 
 use core::{
     event::Action,
     module::{Module as CoreModule, Shortcut},
-    ui::Theme,
 };
 
 /// Music track metadata
@@ -153,9 +155,9 @@ impl MusicModule {
         }
 
         let supported_extensions = ["mp3", "flac", "ogg", "wav", "m4a"];
-
+        let music_dir = &self.music_dir;
         self.tracks.clear();
-        self.load_directory_recursive(&self.music_dir, &supported_extensions)?;
+        self.load_directory_recursive(music_dir, &supported_extensions)?;
 
         Ok(())
     }
@@ -213,7 +215,7 @@ impl MusicModule {
             let decoder = rodio::Decoder::new(std::io::BufReader::new(file))?;
 
             if let Some(ref sink) = self.sink {
-                let mut sink = sink.lock();
+                let mut sink = sink.lock().unwrap();
                 sink.stop();
                 sink.append(decoder);
                 sink.play();
@@ -231,7 +233,7 @@ impl MusicModule {
     /// Pause playback
     pub fn pause(&mut self) {
         if let Some(ref sink) = self.sink {
-            sink.lock().pause();
+            sink.lock().unwrap().pause();
             self.playback_state = PlaybackState::Paused;
         }
     }
@@ -239,7 +241,7 @@ impl MusicModule {
     /// Resume playback
     pub fn resume(&mut self) {
         if let Some(ref sink) = self.sink {
-            sink.lock().play();
+            sink.lock().unwrap().play();
             self.playback_state = PlaybackState::Playing;
         }
     }
@@ -247,7 +249,7 @@ impl MusicModule {
     /// Stop playback
     pub fn stop(&mut self) {
         if let Some(ref sink) = self.sink {
-            sink.lock().stop();
+            sink.lock().unwrap().stop();
         }
         self.playback_state = PlaybackState::Stopped;
         self.current_track_index = None;
@@ -298,7 +300,7 @@ impl MusicModule {
     pub fn set_volume(&mut self, volume: f32) {
         self.volume = volume.clamp(0.0, 1.0);
         if let Some(ref sink) = self.sink {
-            sink.lock().set_volume(self.volume);
+            sink.lock().unwrap().set_volume(self.volume);
         }
     }
 

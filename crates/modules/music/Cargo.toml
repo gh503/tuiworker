@@ -15,3 +15,4 @@ rodio = { workspace = true }
 log = { workspace = true }
 dirs = { workspace = true }
 parking_lot = { workspace = true }
+rand = "0.8"

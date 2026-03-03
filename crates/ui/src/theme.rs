@@ -118,6 +118,29 @@ impl Theme {
             ColorScheme::Light => Style::default().bg(Color::Rgb(230, 230, 255)),
         }
     }
+
+    /// 获取文本颜色
+    pub fn text(&self) -> Color {
+        match self.color_scheme {
+            ColorScheme::Default => Color::White,
+            ColorScheme::Dark => Color::Gray,
+            ColorScheme::Light => Color::Black,
+        }
+    }
+
+    /// 获取淡化文本颜色
+    pub fn muted(&self) -> Color {
+        Color::DarkGray
+    }
+
+    /// 获取表面背景颜色
+    pub fn surface(&self) -> Color {
+        match self.color_scheme {
+            ColorScheme::Default => Color::Reset,
+            ColorScheme::Dark => Color::Rgb(20, 20, 30),
+            ColorScheme::Light => Color::Rgb(245, 245, 250),
+        }
+    }
 }
 
 #[cfg(test)]
