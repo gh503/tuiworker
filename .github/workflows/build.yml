@@ -1,0 +1,84 @@
+name: Cross-Platform Build
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            artifact_suffix: linux-musl
+          - target: x86_64-pc-windows-gnu
+            os: ubuntu-latest
+            artifact_suffix: windows
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            artifact_suffix: macos-x86_64
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            artifact_suffix: macos-arm64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-action@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build
+        run: |
+          cargo build --release --target ${{ matrix.target }} 2>&1 | tee build-${{ matrix.artifact_suffix }}.log
+
+      - name: Show binary info
+        run: |
+          echo "=== Binary Info ===" >> build-${{ matrix.artifact_suffix }}.log
+          ls -lh target/${{ matrix.target }}/release/tui-workstation* >> build-${{ matrix.artifact_suffix }}.log
+          file target/${{ matrix.target }}/release/tui-workstation* >> build-${{ matrix.artifact_suffix }}.log
+          echo "=== Dependencies ===" >> build-${{ matrix.artifact_suffix }}.log
+          if command -v ldd &> /dev/null; then
+            ldd target/${{ matrix.target }}/release/tui-workstation >> build-${{ matrix.artifact_suffix }}.log 2>&1
+          fi
+
+      - name: Upload build log
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log-${{ matrix.artifact_suffix }}
+          path: build-${{ matrix.artifact_suffix }}.log
+          retention-days: 30
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.artifact_suffix }}
+          path: |
+            target/${{ matrix.target }}/release/tui-workstation
+            target/${{ matrix.target }}/release/tui-workstation.exe
+          retention-days: 30
+
+  summary:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all logs
+        uses: actions/download-artifact@v4
+        with:
+          path: logs
+
+      - name: Display build results
+        run: |
+          echo "=== Build Summary ==="
+          for log in logs/build-log-*; do
+            echo "--- $log ---"
+            tail -20 "$log"
+          done

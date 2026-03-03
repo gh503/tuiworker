@@ -1,0 +1,17 @@
+[package]
+name = "tui-workstation"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "tui-workstation"
+path = "main.rs"
+
+[dependencies]
+core = { path = "../crates/core" }
+logging = { path = "../crates/logging" }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+log = { workspace = true }
+anyhow = { workspace = true }
