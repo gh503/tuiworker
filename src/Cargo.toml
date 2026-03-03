@@ -6,12 +6,16 @@ authors.workspace = true
 license.workspace = true
 
 [[bin]]
-name = "tui-workstation"
+name = "tuiworker"
 path = "main.rs"
 
 [dependencies]
 core = { path = "../crates/core" }
 logging = { path = "../crates/logging" }
+ui = { path = "../crates/ui" }
+storage = { path = "../crates/storage" }
+filebrowser = { path = "../crates/modules/filebrowser" }
+todo = { path = "../crates/modules/todo" }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 log = { workspace = true }
 anyhow = { workspace = true }

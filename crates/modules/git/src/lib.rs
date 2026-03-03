@@ -22,8 +22,9 @@ use git2::{
 use core::{
     event::Action,
     module::{Module as CoreModule, Shortcut},
-    ui::Theme,
 };
+
+use ui::Theme;
 
 /// Git commit information
 #[derive(Debug, Clone)]
@@ -43,6 +44,8 @@ impl From<&Commit<'_>> for GitCommit {
             .as_object()
             .short_id()
             .unwrap_or_default()
+            .as_str()
+            .unwrap_or("<short>")
             .to_string();
         let message = commit.message().unwrap_or("<no message>").to_string();
         let author = commit.author().name().unwrap_or("<unknown>").to_string();
@@ -129,18 +132,17 @@ impl GitModule {
 
     /// Load repository information
     fn load_repository_info(&mut self) -> anyhow::Result<()> {
+        let repo_path = self.repo.as_ref().map(|r| r.path().to_path_buf());
+
         if let Some(ref repo) = self.repo {
-            // Load commit history (last 100 commits)
             self.commits = self.load_commits(repo, 100)?;
-
-            // Load file status
             self.file_statuses = self.load_file_status(repo)?;
+        }
 
-            // Load branches
-            self.load_branches(repo)?;
-
-            // Get current branch
-            self.current_branch = self.get_current_branch(repo)?;
+        if let Some(path) = repo_path {
+            let repo = Repository::open(&path)?;
+            self.load_branches(&repo)?;
+            self.current_branch = self.get_current_branch(&repo)?;
         }
         Ok(())
     }
@@ -192,7 +194,10 @@ impl GitModule {
         self.branches = branches
             .filter_map(|b| b.ok())
             .filter(|(b, _)| b.is_head())
-            .map(|(b, _)| b.shorthand().unwrap_or("<unknown>").to_string())
+            .map(|(b, _)| match b.name() {
+                Ok(Some(n)) => n.to_string(),
+                _ => "<unknown>".to_string(),
+            })
             .collect();
 
         Ok(())
@@ -201,7 +206,10 @@ impl GitModule {
     /// Get current branch name
     fn get_current_branch(&self, repo: &Repository) -> anyhow::Result<String> {
         let head = repo.head()?;
-        let name = head.shorthand().unwrap_or("<detached>").to_string();
+        let name = match head.name() {
+            Some(n) => n.to_string(),
+            None => "<detached>".to_string(),
+        };
         Ok(name)
     }
 

@@ -17,7 +17,6 @@ use std::{
 
 use rand::seq::SliceRandom;
 
-
 use rodio::{OutputStream, OutputStreamHandle, Sink};
 
 use ui::Theme;
@@ -50,7 +49,8 @@ impl Track {
         let (artist, title) = if let Some(pos) = filename.find(" - ") {
             let artist_part = &filename[..pos];
             let title_part = &filename[pos + 3..];
-            let title_clean = title_part.trim_end_matches(".mp3")
+            let title_clean = title_part
+                .trim_end_matches(".mp3")
                 .trim_end_matches(".flac")
                 .trim_end_matches(".ogg")
                 .trim_end_matches(".wav")
@@ -155,19 +155,15 @@ impl MusicModule {
         }
 
         let supported_extensions = ["mp3", "flac", "ogg", "wav", "m4a"];
-        let music_dir = &self.music_dir;
+        let music_dir = self.music_dir.clone();
         self.tracks.clear();
-        self.load_directory_recursive(music_dir, &supported_extensions)?;
+        self.load_directory_recursive(&music_dir, &supported_extensions)?;
 
         Ok(())
     }
 
     /// Recursively load directory
-    fn load_directory_recursive(
-        &mut self,
-        dir: &Path,
-        extensions: &[&str],
-    ) -> anyhow::Result<()> {
+    fn load_directory_recursive(&mut self, dir: &Path, extensions: &[&str]) -> anyhow::Result<()> {
         for entry in std::fs::read_dir(dir)? {
             let entry = entry?;
             let path = entry.path();
@@ -263,13 +259,15 @@ impl MusicModule {
         }
 
         let next_index = match self.current_track_index {
-            Some(idx) => if idx + 1 < self.tracks.len() {
-                idx + 1
-            } else if self.repeat_mode == RepeatMode::All {
-                0
-            } else {
-                return;
-            },
+            Some(idx) => {
+                if idx + 1 < self.tracks.len() {
+                    idx + 1
+                } else if self.repeat_mode == RepeatMode::All {
+                    0
+                } else {
+                    return;
+                }
+            }
             None => return,
         };
 
@@ -283,13 +281,15 @@ impl MusicModule {
         }
 
         let prev_index = match self.current_track_index {
-            Some(idx) => if idx > 0 {
-                idx - 1
-            } else if self.repeat_mode == RepeatMode::All {
-                self.tracks.len() - 1
-            } else {
-                return;
-            },
+            Some(idx) => {
+                if idx > 0 {
+                    idx - 1
+                } else if self.repeat_mode == RepeatMode::All {
+                    self.tracks.len() - 1
+                } else {
+                    return;
+                }
+            }
             None => return,
         };
 
@@ -340,20 +340,21 @@ impl MusicModule {
     /// Draw playlist
     fn draw_playlist(&self, frame: &mut Frame, area: Rect) {
         let mut lines = vec![
-            Line::from(vec![
-                Span::styled(
-                    format!("播放列表 ({} 首)", self.tracks.len()),
-                    Style::default()
-                        .fg(self.theme.primary())
-                        .add_modifier(Modifier::BOLD),
-                ),
-            ]),
+            Line::from(vec![Span::styled(
+                format!("播放列表 ({} 首)", self.tracks.len()),
+                Style::default()
+                    .fg(self.theme.primary())
+                    .add_modifier(Modifier::BOLD),
+            )]),
             Line::default(),
         ];
 
         if self.tracks.is_empty() {
             lines.push(Line::from("没有找到音乐文件"));
-            lines.push(Line::from(format!("音乐目录: {}", self.music_dir.display())));
+            lines.push(Line::from(format!(
+                "音乐目录: {}",
+                self.music_dir.display()
+            )));
         } else {
             let visible_count = area.height.saturating_sub(3) as usize / 2;
             let start = self.selected_index.saturating_sub(visible_count / 2);
@@ -490,8 +491,7 @@ impl MusicModule {
     /// Draw help bar
     fn draw_help_bar(&self, frame: &mut Frame, area: Rect) {
         let help = "Space:播放/停止 <:音量- >:音量+ r:切换循环 s:切换随机 n:下一首 p:上一首 j/k:导航 Enter:播放选中";
-        let paragraph = Paragraph::new(help)
-            .style(Style::default().fg(self.theme.muted()));
+        let paragraph = Paragraph::new(help).style(Style::default().fg(self.theme.muted()));
         frame.render_widget(paragraph, area);
     }
 
@@ -577,7 +577,7 @@ impl CoreModule for MusicModule {
         let layout = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(5),  // Player
+                Constraint::Length(5), // Player
                 Constraint::Min(5),    // Playlist
                 Constraint::Length(1), // Volume
                 Constraint::Length(1), // Help
@@ -590,7 +590,9 @@ impl CoreModule for MusicModule {
         self.draw_help_bar(frame, layout[3]);
     }
 
-    fn save(&self) -> anyhow::Result<()> { Ok(()) }
+    fn save(&self) -> anyhow::Result<()> {
+        Ok(())
+    }
 
     fn load(&mut self) -> anyhow::Result<()> {
         self.load_music()?;

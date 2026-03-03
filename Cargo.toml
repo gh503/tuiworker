@@ -14,6 +14,7 @@ members = [
     "crates/modules/music",
     "crates/modules/project",
     "crates/modules/mail",
+    "src",
 ]
 resolver = "2"
 
@@ -62,12 +63,12 @@ lofty = "0.18"
 parking_lot = "0.12"
 
 # 邮件
-imap = { version = "2.4", features = ["rustls-tls"] }
-lettre = "0.11"
+imap = { version = "3.0.0-alpha.15", features = ["rustls-tls"] }
+lettre = { version = "0.11", default-features = false, features = ["file-transport", "smtp-transport", "builder", "tokio1", "serde"] }
 mailparse = "0.14"
 
 # Git
-git2 = { version = "0.18", features = ["vendored-libgit2"] }
+git2 = { version = "0.20", features = ["vendored-libgit2"] }
 
 # 日历/农历
 lunar-rs = "0.4"
@@ -78,3 +79,6 @@ portable-pty = "0.8"
 
 # 其他
 opener = "0.6"
+
+[workspace.dependencies.logging]
+path = "crates/logging"

@@ -12,8 +12,7 @@ crossterm = { workspace = true }
 ratatui = { workspace = true }
 anyhow = { workspace = true }
 imap = { version = "3.0.0-alpha.15", features = ["rustls-tls"] }
-native-tls = { version = "0.2", features = ["vendored"] }
-lettre = { version = "0.11", default-features = false, features = ["tokio1-rustls", "builder", "smtp-transport"] }
+lettre = { version = "0.11", default-features = false, features = ["file-transport", "smtp-transport", "builder", "tokio1", "serde"] }
 mailparse = { workspace = true }
 log = { workspace = true }
 chrono = { workspace = true }

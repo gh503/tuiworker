@@ -1,4 +1,4 @@
-# TUI Workstation
+# TUIWorker
 
 一个基于 Rust 的终端用户界面（TUI）工作站应用，为终端爱好者提供统一、高效的命令行工作环境。
 
@@ -36,8 +36,8 @@
 
 ```bash
 # 从源码编译
-git clone https://github.com/yourname/tui-workstation
-cd tui-workstation
+git clone https://github.com/yourname/tuiworker
+cd tuiworker
 cargo build --release
 
 # 或下载预编译二进制文件（暂未发布）
@@ -48,7 +48,7 @@ cargo build --release
 首次运行会自动生成配置文件：
 
 ```bash
-~/.config/tui-workstation/config.toml
+~/.config/tuiworker/config.toml
 ```
 
 编辑配置文件可以自定义快捷键、主题和模块设置。
@@ -62,13 +62,13 @@ cargo run
 或
 
 ```bash
-./target/release/tui-workstation
+./target/release/tuiworker
 ```
 
 ## 项目结构
 
 ```
-tuiworkstation/
+tuiworker/
 ├── crates/                  # Rust crate 工作空间
 │   ├── core/               # 核心库 (Module trait, 事件系统)
 │   ├── storage/            # 数据存储 (sled 封装)
@@ -179,10 +179,10 @@ default_shell = "bash"
 ## 数据存储
 
 - **数据库**: `sled` 嵌入式键值存储
-- **位置**: `~/.local/share/tui-workstation/db`
+- **位置**: `~/.local/share/tuiworker/db`
 - **笔记**: `~/notes` (Markdown 文件)
 - **日记**: `~/diary` (Markdown 文件)
-- **日志**: `~/.local/share/tui-workstation/logs/`
+- **日志**: `~/.local/share/tuiworker/logs/`
 
 ## 贡献指南
 
@@ -192,8 +192,8 @@ default_shell = "bash"
 
 ```bash
 # 克隆项目
-git clone https://github.com/yourname/tui-workstation
-cd tui-workstation
+git clone https://github.com/yourname/tuiworker
+cd tuiworker
 
 # 运行测试
 cargo test
@@ -229,7 +229,7 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 
 ## 联系方式
 
-- Issue: [GitHub Issues](https://github.com/yourname/tui-workstation/issues)
+- Issue: [GitHub Issues](https://github.com/yourname/tuiworker/issues)
 - Email: your.email@example.com
 
 ---

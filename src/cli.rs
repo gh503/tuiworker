@@ -38,7 +38,7 @@ pub fn parse_args() -> CliArgs {
                 std::process::exit(0);
             }
             "--version" | "-v" => {
-                println!("TUI Workstation v{} (WIP)", env!("CARGO_PKG_VERSION"));
+                println!("TUIWorker v{} (WIP)", env!("CARGO_PKG_VERSION"));
                 std::process::exit(0);
             }
             _ => {}
@@ -49,10 +49,10 @@ pub fn parse_args() -> CliArgs {
 }
 
 fn print_help() {
-    println!("TUI Workstation - Terminal UI Workstation");
+    println!("TUIWorker - Terminal UI Workstation");
     println!();
     println!("USAGE:");
-    println!("    tui-workstation [OPTIONS]");
+    println!("    tuiworker [OPTIONS]");
     println!();
     println!("OPTIONS:");
     println!("    -c, --config <PATH>     Path to config file");

@@ -28,35 +28,16 @@ impl Default for LogConfig {
 
 /// 初始化日志系统
 pub fn init_logging(config: &LogConfig) -> Result<()> {
-    // 解析日志级别
     let level = parse_log_level(&config.log_level);
 
-    let mut dispatch = fern::Dispatch::new()
-        .level(level)
-        .chain(std::io::stdout())
-        .format(|out, message, record| {
-            out.finish(format_args!(
-                "{}[{}][{}] {}",
-                style_level(record.level()),
-                record.target(),
-                Local::now().format("%H:%M:%S"),
-                message
-            ))
-        });
+    let mut dispatch = fern::Dispatch::new().level(level);
 
-    // 文件日志
     if config.log_to_file {
-        // 创建日志目录
-        if let Some(parent) = config.log_file.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-
-        dispatch = dispatch.chain(fern::log_file(config.log_file.clone())?);
+        let dispatch_builder = dispatch.chain(fern::log_file(config.log_file.clone())?);
+        dispatch_builder.apply()?;
+    } else {
+        dispatch.apply()?;
     }
-
-    dispatch.apply()?;
-
-    log::info!("Logging initialized at level: {:?}", level);
 
     Ok(())
 }

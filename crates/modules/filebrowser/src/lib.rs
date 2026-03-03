@@ -36,6 +36,7 @@ impl CoreModule for FileBrowserModule {
     fn update(&mut self, event: CrosstermEvent) -> Action {
         match event {
             CrosstermEvent::Key(key) => self.browser.handle_key_event(key),
+            CrosstermEvent::Mouse(mouse) => self.browser.handle_mouse_event(mouse),
             _ => Action::None,
         }
     }
@@ -71,6 +72,3 @@ impl CoreModule for FileBrowserModule {
         Ok(())
     }
 }
-
-// 重新导出
-pub use FileBrowserModule;

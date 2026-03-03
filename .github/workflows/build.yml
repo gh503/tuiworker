@@ -44,12 +44,22 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y musl-tools libssl-dev
 
+      - name: Install Windows cross-compilation tools
+        if: matrix.target == 'x86_64-pc-windows-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-mingw-w64-x86-64-win32
+
       - name: Build
         run: |
           echo "=== Starting Build ===" > build-${{ matrix.artifact_suffix }}.log
           if [ "${{ matrix.target }}" = "x86_64-unknown-linux-musl" ]; then
             # For musl target, we need to avoid OpenSSL entirely
             # Use rustls instead of native-tls
+            export OPENSSL_NO_VENDOR=1
+            cargo build --release --target ${{ matrix.target }} 2>&1 | tee -a build-${{ matrix.artifact_suffix }}.log
+          elif [ "${{ matrix.target }}" = "x86_64-pc-windows-gnu" ]; then
+            # For Windows target, we also need to avoid OpenSSL
             export OPENSSL_NO_VENDOR=1
             cargo build --release --target ${{ matrix.target }} 2>&1 | tee -a build-${{ matrix.artifact_suffix }}.log
           else
@@ -60,11 +70,11 @@ jobs:
       - name: Show binary info
         run: |
           echo "=== Binary Info ===" >> build-${{ matrix.artifact_suffix }}.log
-          ls -lh target/${{ matrix.target }}/release/tui-workstation* >> build-${{ matrix.artifact_suffix }}.log
-          file target/${{ matrix.target }}/release/tui-workstation* >> build-${{ matrix.artifact_suffix }}.log
+          ls -lh target/${{ matrix.target }}/release/tuiworker* >> build-${{ matrix.artifact_suffix }}.log
+          file target/${{ matrix.target }}/release/tuiworker* >> build-${{ matrix.artifact_suffix }}.log
           echo "=== Dependencies ===" >> build-${{ matrix.artifact_suffix }}.log
           if command -v ldd &> /dev/null; then
-            ldd target/${{ matrix.target }}/release/tui-workstation >> build-${{ matrix.artifact_suffix }}.log 2>&1
+            ldd target/${{ matrix.target }}/release/tuiworker >> build-${{ matrix.artifact_suffix }}.log 2>&1
           fi
 
       - name: Upload build log
@@ -79,8 +89,8 @@ jobs:
         with:
           name: binary-${{ matrix.artifact_suffix }}
           path: |
-            target/${{ matrix.target }}/release/tui-workstation
-            target/${{ matrix.target }}/release/tui-workstation.exe
+            target/${{ matrix.target }}/release/tuiworker
+            target/${{ matrix.target }}/release/tuiworker.exe
           retention-days: 30
 
   summary:

@@ -1,22 +1,34 @@
 mod cli;
 
+use core::App;
 use log::info;
+use logging::init::{init_logging, LogConfig};
 use std::error::Error;
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
-    // 初始化日志
-    logging::init_logging(&logging::LogConfig::default())?;
-    info!("TUI Workstation starting...");
+fn main() -> Result<(), Box<dyn Error>> {
+    init_logging(&LogConfig::default())?;
+    info!("TUIWorker starting...");
 
-    // TODO: 初始化配置管理
-    // TODO: 初始化数据库
-    // TODO: 构建应用实例
-    // TODO: 注册模块
-    // TODO: 运行应用
+    let _args = cli::parse_args();
 
-    println!("TUI Workstation - Coming Soon!");
-    println!("See docs/implementation-plan.md for progress");
+    let mut app = App::new()?;
 
+    let home_dir = std::env::home_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
+
+    let filebrowser_module = filebrowser::FileBrowserModule::new(home_dir.clone());
+    app.register_module(filebrowser_module);
+    info!("Registered FileBrowser module");
+
+    let db_dir = home_dir.join(".local/share/tuiworker");
+    std::fs::create_dir_all(&db_dir)?;
+    let db = storage::Database::open(&db_dir.join("db"))?;
+    let todo_db = db.with_namespace("todo");
+    let todo_module = todo::Todo::new(todo_db);
+    app.register_module(todo_module);
+    info!("Registered Todo module");
+
+    app.run()?;
+
+    info!("TUIWorker shut down gracefully");
     Ok(())
 }

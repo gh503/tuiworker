@@ -2,7 +2,7 @@
 
 use crossterm::event::{Event as CrosstermEvent, KeyCode, KeyEvent};
 use ratatui::{
-    layout::{Alignment, Constraint, Direction, Layout, Rect, Margin},
+    layout::{Alignment, Constraint, Direction, Layout, Margin, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span, Text},
     widgets::{Block, Borders, Paragraph, Wrap},
@@ -16,8 +16,9 @@ use chrono::{DateTime, Local, Utc};
 use core::{
     event::Action,
     module::{Module as CoreModule, Shortcut},
-    ui::Theme,
 };
+
+use ui::Theme;
 
 /// Email structure
 #[derive(Debug, Clone)]
@@ -139,12 +140,12 @@ impl MailModule {
     pub fn navigate_down(&mut self) {
         match self.view_mode {
             ViewMode::Folders => {
-                self.selected_folder_index = (self.selected_folder_index + 1)
-                    .min(self.folders.len().saturating_sub(1));
+                self.selected_folder_index =
+                    (self.selected_folder_index + 1).min(self.folders.len().saturating_sub(1));
             }
             ViewMode::EmailList => {
-                self.selected_email_index = (self.selected_email_index + 1)
-                    .min(self.emails.len().saturating_sub(1));
+                self.selected_email_index =
+                    (self.selected_email_index + 1).min(self.emails.len().saturating_sub(1));
             }
             _ => {}
         }
@@ -208,11 +209,8 @@ impl MailModule {
         // Update folder counts
         if self.selected_folder_index < self.folders.len() {
             self.folders[self.selected_folder_index].count = self.emails.len();
-            self.folders[self.selected_folder_index].unread = self
-                .emails
-                .iter()
-                .filter(|e| !e.read)
-                .count();
+            self.folders[self.selected_folder_index].unread =
+                self.emails.iter().filter(|e| !e.read).count();
         }
     }
 
@@ -263,14 +261,12 @@ impl MailModule {
     /// Draw folders view
     fn draw_folders_view(&self, frame: &mut Frame, area: Rect) {
         let mut lines = vec![
-            Line::from(vec![
-                Span::styled(
-                    "邮箱文件夹",
-                    Style::default()
-                        .fg(self.theme.primary())
-                        .add_modifier(Modifier::BOLD),
-                ),
-            ]),
+            Line::from(vec![Span::styled(
+                "邮箱文件夹",
+                Style::default()
+                    .fg(self.theme.primary())
+                    .add_modifier(Modifier::BOLD),
+            )]),
             Line::default(),
         ];
 
@@ -291,12 +287,10 @@ impl MailModule {
                 String::new()
             };
 
-            lines.push(Line::from(vec![
-                Span::styled(
-                    format!("📁 {}{} ({})", folder.name, unread_badge, folder.count),
-                    style,
-                ),
-            ]));
+            lines.push(Line::from(vec![Span::styled(
+                format!("📁 {}{} ({})", folder.name, unread_badge, folder.count),
+                style,
+            )]));
         }
 
         let paragraph = Paragraph::new(Text::from(lines))
@@ -314,18 +308,16 @@ impl MailModule {
     /// Draw email list view
     fn draw_email_list_view(&self, frame: &mut Frame, area: Rect) {
         let mut lines = vec![
-            Line::from(vec![
-                Span::styled(
-                    format!(
-                        "{} ({})",
-                        self.folders[self.selected_folder_index].name,
-                        self.emails.len()
-                    ),
-                    Style::default()
-                        .fg(self.theme.primary())
-                        .add_modifier(Modifier::BOLD),
+            Line::from(vec![Span::styled(
+                format!(
+                    "{} ({})",
+                    self.folders[self.selected_folder_index].name,
+                    self.emails.len()
                 ),
-            ]),
+                Style::default()
+                    .fg(self.theme.primary())
+                    .add_modifier(Modifier::BOLD),
+            )]),
             Line::default(),
         ];
 
@@ -349,10 +341,17 @@ impl MailModule {
                 };
 
                 lines.push(Line::from(vec![
-                    Span::styled(read_marker, Style::default().fg(if is_unread { Color::Blue } else { Color::Reset })),
+                    Span::styled(
+                        read_marker,
+                        Style::default().fg(if is_unread { Color::Blue } else { Color::Reset }),
+                    ),
                     Span::styled(
                         truncate_string(&email.subject, 50),
-                        style.add_modifier(if is_unread { Modifier::BOLD } else { Modifier::empty() }),
+                        style.add_modifier(if is_unread {
+                            Modifier::BOLD
+                        } else {
+                            Modifier::empty()
+                        }),
                     ),
                 ]));
                 lines.push(Line::from(vec![
@@ -384,7 +383,10 @@ impl MailModule {
             let header_lines = vec![
                 Line::from(vec![
                     Span::styled("主题: ", Style::default().fg(self.theme.muted())),
-                    Span::styled(&email.subject, Style::default().add_modifier(Modifier::BOLD)),
+                    Span::styled(
+                        &email.subject,
+                        Style::default().add_modifier(Modifier::BOLD),
+                    ),
                 ]),
                 Line::from(vec![
                     Span::styled("发件人: ", Style::default().fg(self.theme.muted())),
@@ -427,25 +429,21 @@ impl MailModule {
         let layout = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(3),  // To
-                Constraint::Length(3),  // Subject
+                Constraint::Length(3), // To
+                Constraint::Length(3), // Subject
                 Constraint::Min(5),    // Body
                 Constraint::Length(1), // Help
             ])
             .split(area);
 
         // To field
-        let to_text = vec![
-            Line::from("收件人: "),
-            Line::from(self.compose_to.clone()),
-        ];
-        let to_paragraph = Paragraph::new(Text::from(to_text))
-            .block(
-                Block::default()
-                    .title("收件人")
-                    .borders(Borders::ALL)
-                    .border_style(self.theme.border()),
-            );
+        let to_text = vec![Line::from("收件人: "), Line::from(self.compose_to.clone())];
+        let to_paragraph = Paragraph::new(Text::from(to_text)).block(
+            Block::default()
+                .title("收件人")
+                .borders(Borders::ALL)
+                .border_style(self.theme.border()),
+        );
         frame.render_widget(to_paragraph, layout[0]);
 
         // Subject field
@@ -453,13 +451,12 @@ impl MailModule {
             Line::from("主题: "),
             Line::from(self.compose_subject.clone()),
         ];
-        let subject_paragraph = Paragraph::new(Text::from(subject_text))
-            .block(
-                Block::default()
-                    .title("主题")
-                    .borders(Borders::ALL)
-                    .border_style(self.theme.border()),
-            );
+        let subject_paragraph = Paragraph::new(Text::from(subject_text)).block(
+            Block::default()
+                .title("主题")
+                .borders(Borders::ALL)
+                .border_style(self.theme.border()),
+        );
         frame.render_widget(subject_paragraph, layout[1]);
 
         // Body field
@@ -480,8 +477,7 @@ impl MailModule {
 
         // Help
         let help = "Ctrl+S: 发送 Esc: 取消返回";
-        let help_paragraph = Paragraph::new(help)
-            .style(Style::default().fg(self.theme.muted()));
+        let help_paragraph = Paragraph::new(help).style(Style::default().fg(self.theme.muted()));
         frame.render_widget(help_paragraph, layout[3]);
     }
 
@@ -494,8 +490,7 @@ impl MailModule {
             ViewMode::Compose => "Ctrl+S:发送 Esc:取消",
         };
 
-        let paragraph = Paragraph::new(help)
-            .style(Style::default().fg(self.theme.muted()));
+        let paragraph = Paragraph::new(help).style(Style::default().fg(self.theme.muted()));
         frame.render_widget(paragraph, area);
     }
 
@@ -591,9 +586,13 @@ impl CoreModule for MailModule {
         self.draw_help_bar(frame, layout[1]);
     }
 
-    fn save(&self) -> anyhow::Result<()> { Ok(()) }
+    fn save(&self) -> anyhow::Result<()> {
+        Ok(())
+    }
 
-    fn load(&mut self) -> anyhow::Result<()> { Ok(()) }
+    fn load(&mut self) -> anyhow::Result<()> {
+        Ok(())
+    }
 
     fn shortcuts(&self) -> Vec<Shortcut> {
         vec![
@@ -622,7 +621,9 @@ impl CoreModule for MailModule {
         Ok(())
     }
 
-    fn cleanup(&mut self) -> anyhow::Result<()> { Ok(()) }
+    fn cleanup(&mut self) -> anyhow::Result<()> {
+        Ok(())
+    }
 }
 
 pub use MailModule as Mail;
