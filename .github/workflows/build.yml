@@ -38,10 +38,23 @@ jobs:
           target: ${{ matrix.target }}
           override: true
 
+      - name: Install musl tools
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools libssl-dev
+
       - name: Build
         run: |
           echo "=== Starting Build ===" > build-${{ matrix.artifact_suffix }}.log
-          cargo build --release --target ${{ matrix.target }} 2>&1 | tee -a build-${{ matrix.artifact_suffix }}.log
+          if [ "${{ matrix.target }}" = "x86_64-unknown-linux-musl" ]; then
+            # For musl target, we need to avoid OpenSSL entirely
+            # Use rustls instead of native-tls
+            export OPENSSL_NO_VENDOR=1
+            cargo build --release --target ${{ matrix.target }} 2>&1 | tee -a build-${{ matrix.artifact_suffix }}.log
+          else
+            cargo build --release --target ${{ matrix.target }} 2>&1 | tee -a build-${{ matrix.artifact_suffix }}.log
+          fi
           echo "=== Build Completed ===" >> build-${{ matrix.artifact_suffix }}.log
 
       - name: Show binary info
