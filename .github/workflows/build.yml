@@ -40,7 +40,9 @@ jobs:
 
       - name: Build
         run: |
-          cargo build --release --target ${{ matrix.target }} 2>&1 | tee build-${{ matrix.artifact_suffix }}.log
+          echo "=== Starting Build ===" > build-${{ matrix.artifact_suffix }}.log
+          cargo build --release --target ${{ matrix.target }} 2>&1 | tee -a build-${{ matrix.artifact_suffix }}.log
+          echo "=== Build Completed ===" >> build-${{ matrix.artifact_suffix }}.log
 
       - name: Show binary info
         run: |
