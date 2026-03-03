@@ -13,7 +13,7 @@ ratatui = { workspace = true }
 anyhow = { workspace = true }
 imap = { version = "3.0.0-alpha.15", features = ["rustls-tls"] }
 native-tls = { version = "0.2", features = ["vendored"] }
-lettre = { version = "0.11", default-features = false, features = ["tokio1-rustls1_28", "builder", "smtp-transport"] }
+lettre = { version = "0.11", default-features = false, features = ["tokio1-rustls", "builder", "smtp-transport"] }
 mailparse = { workspace = true }
 log = { workspace = true }
 chrono = { workspace = true }
