@@ -331,7 +331,7 @@ impl App {
         let main_section = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Min(0), Constraint::Length(1)])
-            .split(top_section[1]);
+            .split(separator_area);
 
         let work_status_area = main_section[0];
         let status_bar_area = main_section[1];
@@ -362,100 +362,117 @@ impl App {
     }
 
     fn draw_app_bar(&mut self, frame: &mut ratatui::prelude::Frame, area: Rect) {
-        let total_width = area.width as usize;
-        let padding = 2;
+        let left_width = 30;
+        let right_width = 40;
+        let middle_width = area.width.saturating_sub(left_width + right_width);
+
+        if middle_width < 10 {
+            return;
+        }
+
+        let horizontal_split = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Length(left_width),
+                Constraint::Min(10),
+                Constraint::Length(right_width),
+            ])
+            .split(area);
+
+        let modules_area = horizontal_split[0];
+        let _middle_area = horizontal_split[1];
+        let help_area = horizontal_split[2];
 
         let modules_list: Vec<_> = self.modules.iter().map(|m| m.title()).collect();
-        let text_widths: Vec<usize> = modules_list.iter().map(|title| title.len()).collect();
-        let total_text_width: usize = text_widths.iter().sum();
-        let separator_width = 2;
-        let total_separators = if !modules_list.is_empty() {
-            modules_list.len() - 1
+        let total_modules = modules_list.len();
+
+        let display_count = if total_modules > 0 {
+            (left_width as usize / 4).min(total_modules.max(1))
         } else {
-            0
+            1
         };
 
-        if total_text_width + padding * 2 + total_separators * separator_width > total_width {
-            let collapsed_text = format!(
-                "{} (←/→)",
-                self.modules
-                    .get(self.active_module_index)
-                    .map(|m| m.title())
-                    .unwrap_or("")
-            );
+        if total_modules > 0 {
+            let start_index = if display_count >= total_modules {
+                0
+            } else {
+                let half = display_count / 2;
+                if self.active_module_index + half >= total_modules {
+                    total_modules.saturating_sub(self.active_module_index + half)
+                } else if self.active_module_index > half {
+                    self.active_module_index - half
+                } else {
+                    0
+                }
+            };
 
-            let paragraph = Paragraph::new(collapsed_text)
-                .block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .border_style(Style::default().fg(Color::Cyan)),
-                )
-                .alignment(Alignment::Center);
+            let end_index = (start_index + display_count).min(total_modules);
 
-            frame.render_widget(paragraph, area);
-        } else {
-            let mut current_x = area.x + padding as u16;
+            let mut current_x = modules_area.x + 1;
             self.module_buttons.clear();
 
-            for (i, module) in self.modules.iter().enumerate() {
-                let is_active = i == self.active_module_index;
-                let title = module.title();
+            for i in start_index..end_index {
+                let module_index = i;
+                let is_active = module_index == self.active_module_index;
+                let title = modules_list[module_index].clone();
+                let title_len = title.len();
 
                 let button_text = if is_active {
-                    format!(" {} ", title)
+                    format!("[{}]", &title[0..title_len.min(1)].to_uppercase())
                 } else {
-                    format!("  {}  ", title)
+                    format!(" {} ", &title[0..title_len.min(2)])
                 };
 
                 let button_width = button_text.len() as u16;
 
-                let button_area = Rect {
-                    x: current_x,
-                    y: area.y,
-                    width: button_width,
-                    height: 1,
-                };
+                if current_x + button_width <= modules_area.x + modules_area.width {
+                    let button_area = Rect {
+                        x: current_x,
+                        y: area.y + 1,
+                        width: button_width,
+                        height: 1,
+                    };
 
-                self.module_buttons.push((i, button_area));
+                    self.module_buttons.push((module_index, button_area));
 
-                let paragraph = Paragraph::new(button_text.clone());
-                frame.render_widget(paragraph, button_area);
+                    let style = if is_active {
+                        Style::default()
+                            .fg(Color::Black)
+                            .bg(Color::Cyan)
+                            .add_modifier(ratatui::style::Modifier::BOLD)
+                    } else {
+                        Style::default().fg(Color::White).bg(Color::DarkGray)
+                    };
 
-                if i < self.modules.len() - 1 {
-                    current_x += button_width + separator_width as u16;
+                    let paragraph = Paragraph::new(button_text).style(style);
+                    frame.render_widget(paragraph, button_area);
                 }
+
+                current_x += button_width + 1;
             }
-
-            let border = Block::default()
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::Cyan));
-
-            frame.render_widget(border, area);
         }
 
-        let current_module_name = self
-            .modules
-            .get(self.active_module_index)
-            .map(|m| m.title().to_string())
-            .unwrap_or_default();
-
-        let help_text = format!(
-            "[?] Help | [l] Logs ↓↑ | [q] Quit | {}",
-            current_module_name
-        );
-
-        let help_area = Rect {
-            x: area.x,
-            y: area.y + 1,
-            width: area.width,
-            height: 1,
-        };
+        let help_text = "[?] Help | [l] Logs ↓↑ | [q] Quit";
 
         let paragraph = Paragraph::new(help_text)
-            .alignment(Alignment::Center)
+            .alignment(Alignment::Right)
             .style(Style::default().fg(Color::Gray));
 
         frame.render_widget(paragraph, help_area);
+
+        if total_modules > display_count {
+            let nav_text = format!(" ({}/{})", self.active_module_index + 1, total_modules);
+            let nav_paragraph = Paragraph::new(nav_text)
+                .alignment(Alignment::Center)
+                .style(Style::default().fg(Color::Cyan));
+            frame.render_widget(nav_paragraph, modules_area);
+        }
+
+        let border = Block::default()
+            .borders(Borders::TOP | Borders::BOTTOM)
+            .border_style(Style::default().fg(Color::Cyan));
+
+        frame.render_widget(border, area);
     }
 
     fn draw_separator(&mut self, frame: &mut ratatui::prelude::Frame, area: Rect) {
@@ -521,11 +538,7 @@ impl App {
 
     fn draw_log_panel(&mut self, frame: &mut ratatui::prelude::Frame, area: Rect) {
         if self.log_panel_collapsed {
-            let indicator = if self.log_panel_collapsed {
-                " Logs »"
-            } else {
-                "« Logs"
-            };
+            let indicator = " Logs »";
             let paragraph = Paragraph::new(Line::from(Span::styled(
                 indicator,
                 Style::default().fg(Color::Yellow),
@@ -569,11 +582,7 @@ impl App {
                 })
                 .collect();
 
-            let indicator = if self.log_panel_collapsed {
-                " Logs »"
-            } else {
-                "« Logs"
-            };
+            let indicator = "« Logs";
             let title = format!("Logs (l) ↑↓{}", indicator);
 
             let paragraph = Paragraph::new(log_lines)
