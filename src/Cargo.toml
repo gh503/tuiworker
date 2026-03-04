@@ -19,3 +19,4 @@ todo = { path = "../crates/modules/todo" }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 log = { workspace = true }
 anyhow = { workspace = true }
+atty = { workspace = true }

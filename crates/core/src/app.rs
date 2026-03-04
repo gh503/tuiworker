@@ -5,7 +5,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Position, Rect},
     style::{Color, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders, Clear, Paragraph, Wrap},
     Terminal,
 };
 use std::io;
@@ -23,8 +23,12 @@ pub struct App {
     last_frame_time: Instant,
     tick_rate: Duration,
     status_message: String,
-    module_switcher_area: Option<Rect>,
-    module_button_areas: Vec<(usize, Rect)>,
+    module_buttons: Vec<(usize, Rect)>,
+    log_panel_collapsed: bool,
+    log_panel_height: u16,
+    log_messages: Vec<(log::Level, String)>,
+    dialog_visible: bool,
+    dialog_message: Option<String>,
 }
 
 impl App {
@@ -40,13 +44,53 @@ impl App {
             last_frame_time: Instant::now(),
             tick_rate: Duration::from_millis(33),
             status_message: "Ready".to_string(),
-            module_switcher_area: None,
-            module_button_areas: Vec::new(),
+            module_buttons: Vec::new(),
+            log_panel_collapsed: false,
+            log_panel_height: 6,
+            log_messages: vec![
+                (log::Level::Info, "TUIWorker initialized".to_string()),
+                (
+                    log::Level::Info,
+                    "Modules loaded. Arrow keys to switch.".to_string(),
+                ),
+                (
+                    log::Level::Info,
+                    "Press 'q' to quit, '?' for help".to_string(),
+                ),
+            ],
+            dialog_visible: false,
+            dialog_message: None,
         })
     }
 
     pub fn register_module<M: Module + 'static>(&mut self, module: M) {
         self.modules.push(Box::new(module));
+    }
+
+    pub fn toggle_log_panel(&mut self) {
+        self.log_panel_collapsed = !self.log_panel_collapsed;
+        self.status_message = if self.log_panel_collapsed {
+            "Log panel collapsed".to_string()
+        } else {
+            "Log panel expanded".to_string()
+        };
+    }
+
+    pub fn adjust_log_panel_height(&mut self, delta: i32) {
+        if self.log_panel_collapsed {
+            return;
+        }
+
+        let new_height = self.log_panel_height as i32 + delta;
+        self.log_panel_height = new_height.max(3).min(20) as u16;
+        self.status_message = format!("Log panel height: {}", self.log_panel_height);
+    }
+
+    pub fn add_log_message(&mut self, level: log::Level, message: String) {
+        self.log_messages.push((level, message));
+        if self.log_messages.len() > 100 {
+            self.log_messages.remove(0);
+        }
     }
 
     pub fn run(&mut self) -> anyhow::Result<()> {
@@ -137,7 +181,17 @@ impl App {
                             }
                         }
                         Action::ShowMessage(msg) => {
-                            self.status_message = format!("{:?}", msg);
+                            let message_str = match msg {
+                                Message::Info(s) => s,
+                                Message::Warning(s) => s,
+                                Message::Error(s) => s,
+                            };
+                            self.dialog_visible = true;
+                            self.dialog_message = Some(message_str.clone());
+                            self.log_messages.push((log::Level::Info, message_str));
+                            if self.log_messages.len() > 100 {
+                                self.log_messages.remove(0);
+                            }
                         }
                         _ => {}
                     }
@@ -153,8 +207,37 @@ impl App {
     fn handle_event(&mut self, event: AppEvent) -> anyhow::Result<Option<Action>> {
         match event {
             AppEvent::Key(key) => {
+                if self.dialog_visible
+                    && (key.code == crossterm::event::KeyCode::Esc
+                        || key.code == crossterm::event::KeyCode::Enter)
+                {
+                    self.dialog_visible = false;
+                    self.dialog_message = None;
+                    return Ok(None);
+                }
+
+                if self.dialog_visible {
+                    return Ok(None);
+                }
+
                 match key.code {
                     crossterm::event::KeyCode::Char('q') => return Ok(Some(Action::Quit)),
+                    crossterm::event::KeyCode::Char('l') => {
+                        self.toggle_log_panel();
+                        return Ok(None);
+                    }
+                    crossterm::event::KeyCode::Up => {
+                        if !self.log_panel_collapsed {
+                            self.adjust_log_panel_height(1);
+                            return Ok(None);
+                        }
+                    }
+                    crossterm::event::KeyCode::Down => {
+                        if !self.log_panel_collapsed {
+                            self.adjust_log_panel_height(-1);
+                            return Ok(None);
+                        }
+                    }
                     crossterm::event::KeyCode::Char('?') => {
                         let shortcuts = self.active_module_shortcuts();
                         return Ok(Some(Action::ShowMessage(Message::Info(
@@ -182,22 +265,6 @@ impl App {
                         let module_name = self.modules[self.active_module_index].name().to_string();
                         return Ok(Some(Action::SwitchModule(module_name)));
                     }
-                    crossterm::event::KeyCode::Char(c) => {
-                        if c.is_ascii_digit() {
-                            let digit = c.to_digit(10).unwrap() as usize;
-                            if digit == 0 {
-                                if self.modules.len() >= 10 {
-                                    let module_name = self.modules[9].name().to_string();
-                                    self.active_module_index = 9;
-                                    return Ok(Some(Action::SwitchModule(module_name)));
-                                }
-                            } else if digit <= self.modules.len() {
-                                let module_name = self.modules[digit - 1].name().to_string();
-                                self.active_module_index = digit - 1;
-                                return Ok(Some(Action::SwitchModule(module_name)));
-                            }
-                        }
-                    }
                     _ => {}
                 }
 
@@ -208,17 +275,18 @@ impl App {
                 Ok(action)
             }
             AppEvent::Mouse(mouse) => {
-                if let crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Left) =
-                    mouse.kind
+                if mouse.kind
+                    == crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Left)
                 {
-                    if let Some(module_index) = self.get_module_at_position(mouse.column, mouse.row)
-                    {
-                        return Ok(Some(Action::SwitchModule(
-                            self.modules
-                                .get(module_index)
-                                .map(|m| m.name().to_string())
-                                .unwrap_or_default(),
-                        )));
+                    for (module_index, button_area) in &self.module_buttons {
+                        if button_area.contains(Position::new(mouse.column, mouse.row)) {
+                            return Ok(Some(Action::SwitchModule(
+                                self.modules
+                                    .get(*module_index)
+                                    .map(|m| m.name().to_string())
+                                    .unwrap_or_default(),
+                            )));
+                        }
                     }
                 }
 
@@ -234,15 +302,6 @@ impl App {
         }
     }
 
-    fn get_module_at_position(&self, x: u16, y: u16) -> Option<usize> {
-        for (module_index, button_area) in &self.module_button_areas {
-            if button_area.contains(Position::new(x, y)) {
-                return Some(*module_index);
-            }
-        }
-        None
-    }
-
     fn active_module_shortcuts(&self) -> Vec<String> {
         self.modules
             .get(self.active_module_index)
@@ -255,73 +314,161 @@ impl App {
 
     fn draw(&mut self, frame: &mut ratatui::prelude::Frame) {
         let size = frame.size();
-        if size.height < 5 || size.width < 10 {
+
+        let top_section_height = 3 + 1;
+        if size.height < top_section_height + 5 || size.width < 20 {
             return;
         }
 
-        let chunks = Layout::default()
+        let top_section = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(3),
-                Constraint::Length(1),
-                Constraint::Min(0),
-                Constraint::Length(1),
-                Constraint::Length(3),
-            ])
+            .constraints([Constraint::Length(3), Constraint::Length(1)])
             .split(size);
 
-        let active_module = self.active_module_index;
-        let module_title = self
-            .modules
-            .get(active_module)
-            .map(|m| m.title().to_string())
-            .unwrap_or("No Module".to_string());
+        let app_bar_area = top_section[0];
+        let separator_area = top_section[1];
 
-        self.draw_top_bar(frame, chunks[0], &module_title);
-        self.draw_menu_separator(frame, chunks[1]);
+        let main_section = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Min(0), Constraint::Length(1)])
+            .split(top_section[1]);
 
-        let work_area = chunks[2];
-        let status_bar_area = chunks[3];
-        let switcher_area = chunks[4];
+        let work_status_area = main_section[0];
+        let status_bar_area = main_section[1];
 
-        self.module_switcher_area = Some(switcher_area);
+        let (work_area, log_area) = if !self.log_panel_collapsed {
+            let log_constraint = Constraint::Length(self.log_panel_height);
+            let work_log_split = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Min(3), log_constraint])
+                .split(work_status_area);
+            (work_log_split[0], Some(work_log_split[1]))
+        } else {
+            (work_status_area, None)
+        };
+
+        self.draw_app_bar(frame, app_bar_area);
+        self.draw_separator(frame, separator_area);
         self.draw_work_area(frame, work_area);
         self.draw_status_bar(frame, status_bar_area);
-        self.draw_module_switcher(frame, switcher_area);
+
+        if let Some(log_area) = log_area {
+            self.draw_log_panel(frame, log_area);
+        }
+
+        if self.dialog_visible {
+            self.draw_dialog(frame, size);
+        }
     }
 
-    fn draw_top_bar(&mut self, frame: &mut ratatui::prelude::Frame, area: Rect, title: &str) {
-        let line = Line::from(vec![
-            Span::styled(
-                "TUIWorker",
-                Style::default()
-                    .fg(Color::Cyan)
-                    .add_modifier(ratatui::style::Modifier::BOLD),
-            ),
-            Span::raw(" | "),
-            Span::styled(title, Style::default().fg(Color::White)),
-            Span::raw(" | "),
-            Span::styled("[?]", Style::default().fg(Color::Yellow)),
-            Span::raw(" Help | "),
-            Span::styled("[q]", Style::default().fg(Color::Yellow)),
-            Span::raw(" Quit"),
-        ]);
+    fn draw_app_bar(&mut self, frame: &mut ratatui::prelude::Frame, area: Rect) {
+        let total_width = area.width as usize;
+        let padding = 2;
 
-        let paragraph = Paragraph::new(vec![line])
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .border_style(Style::default().fg(Color::Cyan)),
-            )
-            .alignment(Alignment::Center);
+        let modules_list: Vec<_> = self.modules.iter().map(|m| m.title()).collect();
+        let text_widths: Vec<usize> = modules_list.iter().map(|title| title.len()).collect();
+        let total_text_width: usize = text_widths.iter().sum();
+        let separator_width = 2;
+        let total_separators = if !modules_list.is_empty() {
+            modules_list.len() - 1
+        } else {
+            0
+        };
 
-        frame.render_widget(paragraph, area);
+        if total_text_width + padding * 2 + total_separators * separator_width > total_width {
+            let collapsed_text = format!(
+                "{} (←/→)",
+                self.modules
+                    .get(self.active_module_index)
+                    .map(|m| m.title())
+                    .unwrap_or("")
+            );
+
+            let paragraph = Paragraph::new(collapsed_text)
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .border_style(Style::default().fg(Color::Cyan)),
+                )
+                .alignment(Alignment::Center);
+
+            frame.render_widget(paragraph, area);
+        } else {
+            let mut current_x = area.x + padding as u16;
+            self.module_buttons.clear();
+
+            for (i, module) in self.modules.iter().enumerate() {
+                let is_active = i == self.active_module_index;
+                let title = module.title();
+
+                let button_text = if is_active {
+                    format!(" {} ", title)
+                } else {
+                    format!("  {}  ", title)
+                };
+
+                let button_width = button_text.len() as u16;
+
+                let button_area = Rect {
+                    x: current_x,
+                    y: area.y,
+                    width: button_width,
+                    height: 1,
+                };
+
+                self.module_buttons.push((i, button_area));
+
+                let paragraph = Paragraph::new(button_text.clone());
+                frame.render_widget(paragraph, button_area);
+
+                if i < self.modules.len() - 1 {
+                    current_x += button_width + separator_width as u16;
+                }
+            }
+
+            let border = Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Cyan));
+
+            frame.render_widget(border, area);
+        }
+
+        let current_module_name = self
+            .modules
+            .get(self.active_module_index)
+            .map(|m| m.title().to_string())
+            .unwrap_or_default();
+
+        let help_text = format!(
+            "[?] Help | [l] Logs ↓↑ | [q] Quit | {}",
+            current_module_name
+        );
+
+        let help_area = Rect {
+            x: area.x,
+            y: area.y + 1,
+            width: area.width,
+            height: 1,
+        };
+
+        let paragraph = Paragraph::new(help_text)
+            .alignment(Alignment::Center)
+            .style(Style::default().fg(Color::Gray));
+
+        frame.render_widget(paragraph, help_area);
     }
 
-    fn draw_menu_separator(&mut self, frame: &mut ratatui::prelude::Frame, area: Rect) {
+    fn draw_separator(&mut self, frame: &mut ratatui::prelude::Frame, area: Rect) {
         let line = vec!['─'; area.width as usize];
         let paragraph = Paragraph::new(line.into_iter().collect::<String>())
             .style(Style::default().fg(Color::DarkGray));
+        frame.render_widget(paragraph, area);
+    }
+
+    fn draw_status_bar(&mut self, frame: &mut ratatui::prelude::Frame, area: Rect) {
+        let paragraph = Paragraph::new(self.status_message.clone())
+            .style(Style::default().fg(Color::White).bg(Color::Black))
+            .alignment(Alignment::Center);
         frame.render_widget(paragraph, area);
     }
 
@@ -331,98 +478,122 @@ impl App {
         }
     }
 
-    fn draw_status_bar(&mut self, frame: &mut ratatui::prelude::Frame, area: Rect) {
-        let paragraph = Paragraph::new(self.status_message.clone())
-            .style(Style::default().fg(Color::White).bg(Color::DarkGray))
-            .alignment(Alignment::Center);
-        frame.render_widget(paragraph, area);
-    }
+    fn draw_dialog(&mut self, frame: &mut ratatui::prelude::Frame, area: Rect) {
+        let overlay_width = 60.min(area.width - 4);
+        let overlay_height = 20.min(area.height - 4);
 
-    fn draw_module_switcher(&mut self, frame: &mut ratatui::prelude::Frame, area: Rect) {
-        self.module_button_areas.clear();
-
-        if self.modules.is_empty() {
-            frame.render_widget(
-                Paragraph::new("No modules registered")
-                    .block(
-                        Block::default()
-                            .borders(Borders::ALL)
-                            .border_style(Style::default().fg(Color::Cyan)),
-                    )
-                    .alignment(Alignment::Center),
-                area,
-            );
-            return;
-        }
-
-        let button_width = 12;
-        let gap = 1;
-        let max_buttons = ((area.width - 2) / (button_width + gap)) as usize;
-        let mut start_index = 0;
-
-        if self.active_module_index >= max_buttons {
-            start_index = self.active_module_index - max_buttons + 1;
-        }
-
-        let end_index = (start_index + max_buttons).min(self.modules.len());
-
-        let mut spans = Vec::new();
-        let mut current_x = area.x + 1;
-
-        for i in start_index..end_index {
-            let module = &self.modules[i];
-            let is_active = i == self.active_module_index;
-
-            let button_text = format!(" {} ", module.title());
-
-            let style = if is_active {
-                Style::default()
-                    .fg(Color::Black)
-                    .bg(Color::Cyan)
-                    .add_modifier(ratatui::style::Modifier::BOLD)
-            } else {
-                Style::default().fg(Color::White).bg(Color::DarkGray)
-            };
-
-            let button_area = Rect {
-                x: current_x,
-                y: area.y + 1,
-                width: button_width,
-                height: 1,
-            };
-
-            self.module_button_areas.push((i, button_area));
-
-            spans.push(Span::styled(button_text, style));
-            spans.push(Span::raw(" ".repeat(gap as usize)));
-
-            current_x += button_width + gap;
-        }
-
-        let info_text = if start_index > 0 || end_index < self.modules.len() {
-            format!(" ({}/{}) ", start_index + 1, self.modules.len())
-        } else {
-            format!(" ({}) ", self.modules.len())
+        let overlay_area = Rect {
+            x: area.x + (area.width.saturating_sub(overlay_width)) / 2,
+            y: area.y + (area.height.saturating_sub(overlay_height)) / 2,
+            width: overlay_width,
+            height: overlay_height,
         };
 
-        spans.push(Span::styled(info_text, Style::default().fg(Color::Gray)));
+        let content = if let Some(msg) = &self.dialog_message {
+            vec![
+                Line::from("Message"),
+                Line::from(""),
+                Line::from(msg.clone()),
+                Line::from(""),
+                Line::from("[Enter/Esc] Close"),
+            ]
+        } else {
+            vec![Line::from("")]
+        };
 
-        let mut lines = vec![
-            Line::from(vec![
-                Span::styled("Modules:", Style::default().fg(Color::Cyan)),
-                Span::raw(" Arrow keys: navigate | Click: select"),
-            ]),
-            Line::from(spans),
-        ];
-
-        let paragraph = Paragraph::new(lines)
+        let paragraph = Paragraph::new(content)
             .block(
                 Block::default()
+                    .title("Dialog")
                     .borders(Borders::ALL)
+                    .border_style(
+                        Style::default()
+                            .fg(Color::Cyan)
+                            .add_modifier(ratatui::style::Modifier::BOLD),
+                    ),
+            )
+            .alignment(Alignment::Center)
+            .wrap(Wrap { trim: true });
+
+        frame.render_widget(Clear, overlay_area);
+        frame.render_widget(paragraph, overlay_area);
+    }
+
+    fn draw_log_panel(&mut self, frame: &mut ratatui::prelude::Frame, area: Rect) {
+        if self.log_panel_collapsed {
+            let indicator = if self.log_panel_collapsed {
+                " Logs »"
+            } else {
+                "« Logs"
+            };
+            let paragraph = Paragraph::new(Line::from(Span::styled(
+                indicator,
+                Style::default().fg(Color::Yellow),
+            )))
+            .block(
+                Block::default()
+                    .borders(Borders::TOP | Borders::BOTTOM)
                     .border_style(Style::default().fg(Color::Cyan)),
             )
-            .alignment(Alignment::Left);
+            .alignment(Alignment::Right);
 
-        frame.render_widget(paragraph, area);
+            frame.render_widget(paragraph, area);
+        } else {
+            let log_lines: Vec<Line> = self
+                .log_messages
+                .iter()
+                .map(|(level, msg)| {
+                    let level_str = match level {
+                        log::Level::Error => "ERR",
+                        log::Level::Warn => "WRN",
+                        log::Level::Info => "INF",
+                        log::Level::Debug => "DBG",
+                        log::Level::Trace => "TRC",
+                    };
+
+                    let level_color = match level {
+                        log::Level::Error => Color::Red,
+                        log::Level::Warn => Color::Yellow,
+                        log::Level::Info => Color::Green,
+                        log::Level::Debug => Color::Cyan,
+                        log::Level::Trace => Color::Gray,
+                    };
+
+                    Line::from(vec![
+                        Span::styled(
+                            format!("[{}] ", level_str),
+                            Style::default().fg(level_color),
+                        ),
+                        Span::styled(msg, Style::default().fg(Color::White)),
+                    ])
+                })
+                .collect();
+
+            let indicator = if self.log_panel_collapsed {
+                " Logs »"
+            } else {
+                "« Logs"
+            };
+            let title = format!("Logs (l) ↑↓{}", indicator);
+
+            let paragraph = Paragraph::new(log_lines)
+                .block(
+                    Block::default()
+                        .title(title)
+                        .borders(Borders::ALL)
+                        .border_style(Style::default().fg(Color::Cyan)),
+                )
+                .alignment(Alignment::Left)
+                .scroll((
+                    (self
+                        .log_messages
+                        .len()
+                        .saturating_sub(area.height.saturating_sub(2) as usize))
+                        as u16,
+                    0,
+                ));
+
+            frame.render_widget(paragraph, area);
+        }
     }
 }

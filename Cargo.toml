@@ -52,6 +52,7 @@ fern = "0.6"
 
 # 文件操作
 ignore = "0.4"
+shell-words = "1.0"
 
 # 语法高亮
 syntect = "5.1"
@@ -79,6 +80,7 @@ portable-pty = "0.8"
 
 # 其他
 opener = "0.6"
+atty = "0.2"
 
 [workspace.dependencies.logging]
 path = "crates/logging"
