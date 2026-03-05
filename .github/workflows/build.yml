@@ -119,28 +119,44 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     if: github.event_name == 'release' && github.event.action == 'published'
-    
+
     permissions:
       contents: write
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
-          
+
       - name: Display artifacts
         run: |
           echo "Downloaded artifacts:"
           ls -lh artifacts/
-          
+
+      - name: Build deb package
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev libasound2-dev
+          cargo install cargo-deb
+          cargo build --release
+          cargo deb --no-build
+
+      - name: Build rpm package
+        run: |
+          cargo install cargo-generate-rpm
+          cargo generate-rpm --output=target/rpm/tuiworker.rpm
+
       - name: Upload to Release
         uses: softprops/action-gh-release@v1
         with:
-          files: artifacts/binary-*/tuiworker*
+          files: |
+            artifacts/binary-*/tuiworker*
+            target/debian/*.deb
+            target/rpm/*.rpm
           generate_release_notes: true
           draft: false
           prerelease: false
