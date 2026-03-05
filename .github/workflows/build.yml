@@ -29,17 +29,14 @@ jobs:
           - os: macos-latest
             target: x86_64-apple-darwin
             artifact_suffix: macos-x86_64
-            features: --default-features
-          
+
           - os: macos-latest
             target: aarch64-apple-darwin
             artifact_suffix: macos-arm64
-            features: --default-features
-          
+
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             artifact_suffix: windows
-            features: --default-features
 
     runs-on: ${{ matrix.os }}
 
