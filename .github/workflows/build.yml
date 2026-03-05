@@ -12,18 +12,34 @@ jobs:
     strategy:
       matrix:
         include:
+          # Core version - musl static, all Linux
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            artifact_suffix: linux-static
+            features: --no-default-features
+          
+          # Full version - dynamic, modern Linux
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            artifact_suffix: linux
+            artifact_suffix: linux-dynamic
+            features: --default-features
+          
+          # macOS (always dynamic)
           - os: macos-latest
             target: x86_64-apple-darwin
             artifact_suffix: macos-x86_64
+            features: --default-features
+          
           - os: macos-latest
             target: aarch64-apple-darwin
             artifact_suffix: macos-arm64
+            features: --default-features
+          
+          # Windows
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             artifact_suffix: windows
+            features: --default-features
 
     runs-on: ${{ matrix.os }}
 
@@ -37,8 +53,14 @@ jobs:
           toolchain: stable
           targets: ${{ matrix.target }}
 
-      - name: Install system dependencies (Linux)
+      - name: Install cross (Linux)
         if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          cargo install cross --git https://github.com/cross-rs/cross
+
+      - name: Install system dependencies (Linux dynamic)
+        if: runner.os == 'Linux' && matrix.target != 'x86_64-unknown-linux-musl'
         run: |
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev libasound2-dev
@@ -60,8 +82,14 @@ jobs:
           cargo test --target ${{ matrix.target }} --verbose
 
       - name: Build
+        shell: bash
         run: |
-          cargo build --release --target ${{ matrix.target }}
+          if [ "${{ matrix.target }}" = "x86_64-unknown-linux-musl" ]; then
+            cross build --release --target ${{ matrix.target }} \
+              --no-default-features
+          else
+            cross build --release --target ${{ matrix.target }}
+          fi
 
       - name: Upload binary (Unix)
         if: runner.os != 'Windows'
