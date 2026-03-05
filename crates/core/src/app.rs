@@ -227,8 +227,10 @@ impl App {
                 match key.code {
                     crossterm::event::KeyCode::Char('q') => return Ok(Some(Action::Quit)),
                     crossterm::event::KeyCode::Char('l') => {
-                        self.toggle_log_panel();
-                        return Ok(None);
+                        if key.modifiers == crossterm::event::KeyModifiers::CONTROL {
+                            self.toggle_log_panel();
+                            return Ok(None);
+                        }
                     }
                     crossterm::event::KeyCode::Up => {
                         if !self.log_panel_collapsed
@@ -509,7 +511,7 @@ impl App {
             }
         }
 
-        let help_text = "[?] Help | [l] Logs Ctrl↓↑ | Ctrl+←/→: Switch | [q] Quit";
+        let help_text = "[?] Help | Ctrl+L: Logs Ctrl↓↑ | Ctrl+←/→: Switch | [q] Quit";
 
         let paragraph = Paragraph::new(help_text)
             .alignment(Alignment::Right)
