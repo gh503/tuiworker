@@ -311,12 +311,12 @@ impl FileBrowser {
             height: area.height,
         };
 
-        self.render_file_list(frame, files_area);
+        self.render_file_list(frame, files_area, self.active_area == ActiveArea::FileList);
         self.render_split_bar(frame, split_bar_area);
-        self.render_info_panel(frame, info_area);
+        self.render_info_panel(frame, info_area, self.active_area == ActiveArea::Content);
     }
 
-    fn render_file_list(&self, frame: &mut Frame, area: Rect) {
+    fn render_file_list(&self, frame: &mut Frame, area: Rect, is_active: bool) {
         let items: Vec<ListItem> = self
             .entries
             .iter()
@@ -340,12 +340,29 @@ impl FileBrowser {
             })
             .collect();
 
+        let border_style = if is_active {
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD)
+        } else {
+            self.theme.border()
+        };
+
+        let title_style = if is_active {
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::Gray)
+        };
+
         let list = List::new(items)
             .block(
                 Block::default()
                     .title(format!("Files: {}", self.current_path.display()))
                     .borders(Borders::ALL)
-                    .border_style(self.theme.border()),
+                    .border_style(border_style)
+                    .title_style(title_style),
             )
             .highlight_style(self.theme.highlight());
 
@@ -376,15 +393,15 @@ impl FileBrowser {
         }
     }
 
-    fn render_info_panel(&self, frame: &mut Frame, area: Rect) {
+    fn render_info_panel(&self, frame: &mut Frame, area: Rect, is_active: bool) {
         if let Some(ref content) = self.file_content {
-            self.render_file_content(frame, area);
+            self.render_file_content(frame, area, is_active);
         } else {
-            self.render_file_info(frame, area);
+            self.render_file_info(frame, area, is_active);
         }
     }
 
-    fn render_file_info(&self, frame: &mut Frame, area: Rect) {
+    fn render_file_info(&self, frame: &mut Frame, area: Rect, is_active: bool) {
         let mut lines = vec![Line::from("File Info"), Line::from(""), Line::from("")];
 
         if let Some(entry) = self.get_selected() {
@@ -434,19 +451,52 @@ impl FileBrowser {
             lines.push(Line::from("No file selected"));
         }
 
+        let border_style = if is_active {
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD)
+        } else {
+            self.theme.border()
+        };
+
+        let title_style = if is_active {
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::Gray)
+        };
+
         let paragraph = Paragraph::new(lines)
             .block(
                 Block::default()
                     .title("Info")
                     .borders(Borders::ALL)
-                    .border_style(self.theme.border()),
+                    .border_style(border_style)
+                    .title_style(title_style),
             )
             .alignment(Alignment::Left);
 
         frame.render_widget(paragraph, area);
     }
 
-    fn render_file_content(&self, frame: &mut Frame, area: Rect) {
+    fn render_file_content(&self, frame: &mut Frame, area: Rect, is_active: bool) {
+        let border_style = if is_active {
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD)
+        } else {
+            self.theme.border()
+        };
+
+        let title_style = if is_active {
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::Gray)
+        };
+
         if let Some(ref content) = self.file_content {
             let border_height = 2;
             let available_height = area.height.saturating_sub(border_height) as usize;
@@ -473,7 +523,8 @@ impl FileBrowser {
                             lines.len()
                         ))
                         .borders(Borders::ALL)
-                        .border_style(self.theme.border()),
+                        .border_style(border_style)
+                        .title_style(title_style),
                 )
                 .alignment(Alignment::Left);
 
@@ -484,10 +535,10 @@ impl FileBrowser {
                     Block::default()
                         .title("File Content")
                         .borders(Borders::ALL)
-                        .border_style(self.theme.border()),
+                        .border_style(border_style)
+                        .title_style(title_style),
                 )
-                .alignment(Alignment::Center);
-
+                .alignment(Alignment::Left);
             frame.render_widget(paragraph, area);
         }
     }
