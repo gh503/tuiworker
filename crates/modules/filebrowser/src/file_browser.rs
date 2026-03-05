@@ -171,7 +171,15 @@ impl FileBrowser {
                             self.file_content = Some(text);
                             self.selected_file_path = Some(entry_path.display().to_string());
                             self.content_scroll_offset = 0;
-                            log::info!("Opened text file: {:?}", entry_path);
+                            log::info!(
+                                "Opened text file: {:?}, file_content set to Some",
+                                entry_path
+                            );
+                            log::info!(
+                                "Current state - file_content: {}, selected_file_path: {:?}",
+                                self.file_content.is_some(),
+                                self.selected_file_path
+                            );
                         }
                         Err(e) => {
                             self.file_content = Some(format!("Error reading file: {}", e));
@@ -1183,6 +1191,15 @@ impl FileBrowser {
     }
 
     pub fn get_status(&self) -> String {
+        log::debug!(
+            "get_status - file_content.is_some(): {}",
+            self.file_content.is_some()
+        );
+        log::debug!(
+            "get_status - selected_file_path: {:?}",
+            self.selected_file_path
+        );
+
         if self.file_content.is_some() {
             if let Some(ref file_path) = self.selected_file_path {
                 let file_name = std::path::Path::new(file_path)
@@ -1197,7 +1214,9 @@ impl FileBrowser {
                     .map(|c| c.lines().count())
                     .unwrap_or(0);
 
-                format!("{}: Line {} / {}", file_name, current_line, total_lines)
+                let status = format!("{}: Line {} / {}", file_name, current_line, total_lines);
+                log::debug!("get_status returning: {}", status);
+                status
             } else {
                 "Opened File".to_string()
             }
