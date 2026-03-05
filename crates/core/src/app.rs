@@ -26,6 +26,8 @@ pub struct App {
     module_buttons: Vec<(usize, Rect)>,
     log_panel_collapsed: bool,
     log_panel_height: u16,
+    log_panel_dragging: bool,
+    log_panel_area: Option<Rect>,
     log_messages: Vec<(log::Level, String)>,
     dialog_visible: bool,
     dialog_message: Option<String>,
@@ -47,6 +49,8 @@ impl App {
             module_buttons: Vec::new(),
             log_panel_collapsed: false,
             log_panel_height: 6,
+            log_panel_dragging: false,
+            log_panel_area: None,
             log_messages: vec![
                 (log::Level::Info, "TUIWorker initialized".to_string()),
                 (
@@ -279,6 +283,45 @@ impl App {
                 Ok(action)
             }
             AppEvent::Mouse(mouse) => {
+                if let Some(log_area) = self.log_panel_area {
+                    let drag_area = Rect {
+                        x: log_area.x,
+                        y: log_area.y,
+                        width: log_area.width,
+                        height: 1,
+                    };
+
+                    match mouse.kind {
+                        crossterm::event::MouseEventKind::Down(
+                            crossterm::event::MouseButton::Left,
+                        ) => {
+                            if drag_area.contains(Position::new(mouse.column, mouse.row))
+                                && !self.log_panel_collapsed
+                            {
+                                self.log_panel_dragging = true;
+                                return Ok(Some(Action::Consumed));
+                            }
+                        }
+                        crossterm::event::MouseEventKind::Up(
+                            crossterm::event::MouseButton::Left,
+                        ) => {
+                            self.log_panel_dragging = false;
+                        }
+                        crossterm::event::MouseEventKind::Drag(
+                            crossterm::event::MouseButton::Left,
+                        ) => {
+                            if self.log_panel_dragging && !self.log_panel_collapsed {
+                                let delta = mouse.row as i32 - log_area.y as i32;
+                                if delta != 0 {
+                                    self.adjust_log_panel_height(delta);
+                                    return Ok(Some(Action::Consumed));
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+
                 if mouse.kind
                     == crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Left)
                 {
@@ -364,7 +407,10 @@ impl App {
         self.draw_status_bar(frame, status_bar_area);
 
         if let Some(log_area) = log_area {
+            self.log_panel_area = Some(log_area);
             self.draw_log_panel(frame, log_area);
+        } else {
+            self.log_panel_area = None;
         }
 
         if self.dialog_visible {
@@ -587,14 +633,22 @@ impl App {
                 .collect();
 
             let indicator = "« Logs";
-            let title = format!("Logs (l) ↑↓{}", indicator);
+            let title = format!("Logs (l) Ctrl+↑↓ [Drag here]{}", indicator);
+
+            let border_style = if self.log_panel_dragging {
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(ratatui::style::Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::Cyan)
+            };
 
             let paragraph = Paragraph::new(log_lines)
                 .block(
                     Block::default()
                         .title(title)
                         .borders(Borders::ALL)
-                        .border_style(Style::default().fg(Color::Cyan)),
+                        .border_style(border_style),
                 )
                 .alignment(Alignment::Left)
                 .scroll((
