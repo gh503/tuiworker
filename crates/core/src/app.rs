@@ -227,13 +227,17 @@ impl App {
                         return Ok(None);
                     }
                     crossterm::event::KeyCode::Up => {
-                        if !self.log_panel_collapsed {
+                        if !self.log_panel_collapsed
+                            && key.modifiers == crossterm::event::KeyModifiers::CONTROL
+                        {
                             self.adjust_log_panel_height(1);
                             return Ok(None);
                         }
                     }
                     crossterm::event::KeyCode::Down => {
-                        if !self.log_panel_collapsed {
+                        if !self.log_panel_collapsed
+                            && key.modifiers == crossterm::event::KeyModifiers::CONTROL
+                        {
                             self.adjust_log_panel_height(-1);
                             return Ok(None);
                         }
@@ -459,7 +463,7 @@ impl App {
             }
         }
 
-        let help_text = "[?] Help | [l] Logs ↓↑ | [q] Quit";
+        let help_text = "[?] Help | [l] Logs Ctrl↓↑ | [q] Quit";
 
         let paragraph = Paragraph::new(help_text)
             .alignment(Alignment::Right)
