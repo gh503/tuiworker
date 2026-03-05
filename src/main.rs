@@ -27,6 +27,21 @@ fn main() -> Result<(), Box<dyn Error>> {
     app.register_module(todo_module);
     info!("Registered Todo module");
 
+    #[cfg(feature = "music")]
+    {
+        info!("Music module is available");
+    }
+
+    #[cfg(feature = "git")]
+    {
+        info!("Git module is available");
+    }
+
+    #[cfg(feature = "terminal")]
+    {
+        info!("Terminal module is available");
+    }
+
     app.run()?;
 
     info!("TUIWorker shut down gracefully");

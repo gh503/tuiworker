@@ -9,6 +9,10 @@ license.workspace = true
 name = "tuiworker"
 path = "main.rs"
 
+[features]
+default = ["music", "git", "terminal"]
+static-build = []
+
 [dependencies]
 core = { path = "../crates/core" }
 logging = { path = "../crates/logging" }
@@ -16,7 +20,14 @@ ui = { path = "../crates/ui" }
 storage = { path = "../crates/storage" }
 filebrowser = { path = "../crates/modules/filebrowser" }
 todo = { path = "../crates/modules/todo" }
+note = { path = "../crates/modules/note", optional = true }
+diary = { path = "../crates/modules/diary", optional = true }
+project = { path = "../crates/modules/project", optional = true }
+mail = { path = "../crates/modules/mail", optional = true }
+music = { path = "../crates/modules/music", optional = true }
+git = { path = "../crates/modules/git", optional = true }
+terminal = { path = "../crates/modules/terminal", optional = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 log = { workspace = true }
 anyhow = { workspace = true }
-atty = { workspace = true }
+atty = { workspace = true, optional = true }
