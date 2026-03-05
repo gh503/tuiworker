@@ -18,13 +18,25 @@ jobs:
             artifact_suffix: linux-static
             features: --no-default-features
           
-          # Full version - dynamic, modern Linux
-          - os: ubuntu-latest
+          # Full version 1 - Ubuntu 20.04 (GLIBC 2.31) - broader compatibility
+          - os: ubuntu-20.04
             target: x86_64-unknown-linux-gnu
-            artifact_suffix: linux-dynamic
+            artifact_suffix: linux-glibc2.31
             features: --default-features
           
-          # macOS (always dynamic)
+          # Full version 2 - Ubuntu 22.04 (GLIBC 2.35) - moderate compatibility
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            artifact_suffix: linux-glibc2.35
+            features: --default-features
+          
+          # Full version 3 - Ubuntu 24.04 (GLIBC 2.39) - latest systems
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_suffix: linux-glibc2.39
+            features: --default-features
+          
+          # macOS
           - os: macos-latest
             target: x86_64-apple-darwin
             artifact_suffix: macos-x86_64
@@ -79,7 +91,13 @@ jobs:
 
       - name: Run tests
         run: |
-          cargo test --target ${{ matrix.target }} --verbose
+          if [ "${{ matrix.target }}" = "x86_64-unknown-linux-musl" ]; then
+            # For static build, only test core packages
+            cargo test -p core -p logging -p storage -p filebrowser -p todo --target ${{ matrix.target }} --verbose
+          else
+            # For dynamic build, test all packages
+            cargo test --target ${{ matrix.target }} --verbose
+          fi
 
       - name: Build
         shell: bash
