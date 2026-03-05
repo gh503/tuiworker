@@ -39,6 +39,12 @@ pub struct FileBrowser {
     content_search_query: String,
     content_search_matches: Vec<usize>,
     content_search_index: usize,
+    // Text selection fields
+    text_selection: Option<(usize, usize)>, // (start_byte, end_byte)
+    selection_start_line: Option<usize>,
+    selection_start_col: Option<usize>,
+    selecting: bool,
+    context_menu_visible: bool,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -81,6 +87,11 @@ impl FileBrowser {
             content_search_query: String::new(),
             content_search_matches: Vec::new(),
             content_search_index: 0,
+            text_selection: None,
+            selection_start_line: None,
+            selection_start_col: None,
+            selecting: false,
+            context_menu_visible: false,
         };
         let _ = browser.refresh();
         browser
@@ -796,7 +807,27 @@ impl FileBrowser {
 
                         let border: u16 = 1;
                         let content_y = area.y + border;
+                        let content_area = Rect {
+                            x: split_x + 1,
+                            y: content_y,
+                            width: area.width.saturating_sub(split_x - area.x + 1),
+                            height: area.height.saturating_sub(2),
+                        };
 
+                        // Check if click is in content area (right panel)
+                        if content_area.contains(Position::new(mouse.column, mouse.row))
+                            && self.file_content.is_some()
+                        {
+                            let relative_y = mouse.row - content_area.y;
+                            let relative_x = mouse.column - content_area.x;
+                            self.handle_text_selection_start(
+                                relative_y as usize,
+                                relative_x as usize,
+                            );
+                            return Action::Consumed;
+                        }
+
+                        // Check if click is in file list (left panel)
                         if mouse.row >= content_y && mouse.column < split_x {
                             let relative_y = mouse.row - content_y;
                             let clicked_index = relative_y as usize;
@@ -823,26 +854,49 @@ impl FileBrowser {
                     Action::None
                 }
             }
-            MouseEventKind::Up(MouseButton::Left) => {
-                if self.dragging_split {
-                    self.dragging_split = false;
-                    Action::Consumed
-                } else {
-                    Action::None
-                }
-            }
             MouseEventKind::Drag(MouseButton::Left) => {
                 if self.dragging_split {
                     if let Some(area) = self.render_area {
                         let new_ratio = (mouse.column - area.x) as f32 / area.width as f32;
                         self.split_ratio = new_ratio.clamp(0.1, 0.9);
-                        Action::Consumed
-                    } else {
-                        Action::None
+                        return Action::Consumed;
                     }
-                } else {
-                    Action::None
                 }
+
+                // Handle text selection drag
+                if self.selecting && self.render_area.is_some() && self.file_content.is_some() {
+                    let area = self.render_area.unwrap();
+                    let split_x = area.x + (area.width as f32 * self.split_ratio) as u16;
+                    let content_area = Rect {
+                        x: split_x + 1,
+                        y: area.y + 1,
+                        width: area.width.saturating_sub(split_x - area.x + 1),
+                        height: area.height.saturating_sub(2),
+                    };
+
+                    if content_area.contains(Position::new(mouse.column, mouse.row)) {
+                        let relative_y = mouse.row - content_area.y;
+                        let relative_x = mouse.column - content_area.x;
+                        self.handle_text_selection_update(relative_y as usize, relative_x as usize);
+                        return Action::Consumed;
+                    }
+                }
+
+                Action::None
+            }
+            MouseEventKind::Up(MouseButton::Left) => {
+                self.dragging_split = false;
+                self.handle_text_selection_end();
+                Action::Consumed
+            }
+            MouseEventKind::Down(MouseButton::Right) => {
+                if self.text_selection.is_some() {
+                    if let Ok(text) = self.copy_selected_text() {
+                        log::info!("Copied text to clipboard: {} chars", text.len());
+                    }
+                    return Action::Consumed;
+                }
+                Action::None
             }
             MouseEventKind::ScrollDown => {
                 if self.selected_index < self.entries.len().saturating_sub(1) {
@@ -1021,11 +1075,29 @@ impl FileBrowser {
 
         match key.code {
             KeyCode::Esc | KeyCode::Char('c') => {
-                if self.file_content.is_some() {
+                if key
+                    .modifiers
+                    .contains(crossterm::event::KeyModifiers::CONTROL)
+                {
+                    if self.text_selection.is_some() {
+                        match self.copy_selected_text() {
+                            Ok(text) => {
+                                log::info!("Copied to clipboard: {} chars", text.len());
+                            }
+                            Err(e) => {
+                                log::error!("Failed to copy: {}", e);
+                            }
+                        }
+                        self.text_selection = None;
+                    }
+                    Action::Consumed
+                } else if self.file_content.is_some() {
                     self.close_file();
                     self.active_area = ActiveArea::FileList;
+                    Action::None
+                } else {
+                    Action::None
                 }
-                Action::None
             }
             KeyCode::Tab => {
                 self.active_area = match self.active_area {
@@ -1245,6 +1317,87 @@ impl FileBrowser {
         }
     }
 
+    pub fn copy_selected_text(&self) -> Result<String, String> {
+        if let Some((start, end)) = self.text_selection {
+            if let Some(content) = &self.file_content {
+                let start = start.min(end);
+                let end = end.max(start);
+                if content.len() >= end {
+                    let selected_text = content[start..end].to_string();
+                    if let Err(e) = copier::copy_string(&selected_text) {
+                        return Err(format!("Failed to copy to clipboard: {}", e));
+                    }
+                    return Ok(selected_text);
+                }
+            }
+        }
+        Err("No text selected".to_string())
+    }
+
+    pub fn handle_text_selection_start(&mut self, line: usize, col: usize) {
+        if let Some(content) = &self.file_content {
+            self.selection_start_line = Some(line);
+            self.selection_start_col = Some(col);
+            self.selecting = true;
+
+            // Calculate byte position
+            let byte_pos = self.calculate_byte_position(
+                content,
+                line + self.content_scroll_offset,
+                col + self.content_scroll_offset_x,
+            );
+            self.text_selection = Some((byte_pos, byte_pos));
+        }
+    }
+
+    pub fn handle_text_selection_update(&mut self, line: usize, col: usize) {
+        if self.selecting && self.text_selection.is_some() {
+            if let Some(content) = &self.file_content {
+                let (start, _) = self.text_selection.unwrap();
+                let end_pos = self.calculate_byte_position(
+                    content,
+                    line + self.content_scroll_offset,
+                    col + self.content_scroll_offset_x,
+                );
+                self.text_selection = Some((start, end_pos));
+            }
+        }
+    }
+
+    pub fn handle_text_selection_end(&mut self) {
+        self.selecting = false;
+    }
+
+    fn calculate_byte_position(&self, content: &str, line: usize, col: usize) -> usize {
+        let lines: Vec<&str> = content.lines().collect();
+        let mut byte_pos = 0;
+
+        for (i, l) in lines.iter().enumerate() {
+            if i < line {
+                byte_pos += l.len() + 1; // +1 for newline
+            } else if i == line {
+                let col_chars: Vec<char> = l.chars().take(col).collect();
+                byte_pos += col_chars.len();
+                break;
+            }
+        }
+
+        byte_pos.min(content.len())
+    }
+
+    pub fn get_selected_text(&self) -> Option<String> {
+        if let Some((start, end)) = self.text_selection {
+            if let Some(content) = &self.file_content {
+                let start = start.min(end);
+                let end = end.max(start);
+                if content.len() >= end {
+                    return Some(content[start..end].to_string());
+                }
+            }
+        }
+        None
+    }
+
     pub fn shortcuts(&self) -> Vec<Shortcut> {
         vec![
             Shortcut {
@@ -1269,15 +1422,43 @@ impl FileBrowser {
             },
             Shortcut {
                 key: "s",
-                description: "Toggle sort",
+                description: "Sort by name/size",
             },
             Shortcut {
-                key: "Tab",
-                description: "Switch focus",
+                key: "m",
+                description: "Sort by modified",
             },
             Shortcut {
-                key: "Ctrl+F",
-                description: "Search",
+                key: "/",
+                description: "Search files",
+            },
+            Shortcut {
+                key: "Esc",
+                description: "Exit search/selection",
+            },
+            Shortcut {
+                key: "Ctrl+L/R",
+                description: "Scroll content",
+            },
+            Shortcut {
+                key: "Ctrl+U/D",
+                description: "Scroll content pages",
+            },
+            Shortcut {
+                key: "Ctrl+F/B",
+                description: "Content search",
+            },
+            Shortcut {
+                key: "n/N",
+                description: "Next/prev search result",
+            },
+            Shortcut {
+                key: "Ctrl+C / Right-click",
+                description: "Copy selected text",
+            },
+            Shortcut {
+                key: "Drag in content",
+                description: "Select text",
             },
         ]
     }

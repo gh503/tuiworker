@@ -85,6 +85,7 @@ portable-pty = "0.8"
 # 其他
 opener = "0.6"
 atty = "0.2"
+copier = "0.10"
 
 [workspace.dependencies.logging]
 path = "crates/logging"
