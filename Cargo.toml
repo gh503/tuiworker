@@ -24,7 +24,7 @@ exclude-members = ["mail", "git", "terminal", "music", "project"]
 # DEB package configuration for Debian/Ubuntu
 [package.metadata.deb]
 name = "tuiworker"
-maintainer = "" # TODO: Set maintainer email in format: "Name <email>"
+maintainer = "gh503 <angus_robot@163.com>"
 copyright = "2025, tuiworker contributors"
 license-file = ["LICENSE", "3"]
 extended-description-file = "README.md"
