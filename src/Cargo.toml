@@ -4,10 +4,44 @@ version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
+repository = "https://github.com/gh503/tuiworker"
 
 [[bin]]
 name = "tuiworker"
 path = "main.rs"
+
+# DEB package configuration for Debian/Ubuntu
+[package.metadata.deb]
+name = "tuiworker"
+maintainer = "gh503 <angus_robot@163.com>"
+copyright = "2025, tuiworker contributors"
+license-file = ["../../LICENSE", "3"]
+extended-description-file = "../../README.md"
+section = "utils"
+priority = "optional"
+assets = [
+  ["target/release/tuiworker", "usr/bin/", "755"],
+  ["../../README.md", "usr/share/doc/tuiworker/", "644"],
+  ["../../LICENSE", "usr/share/doc/tuiworker/", "644"],
+]
+depends = "$auto"
+
+# RPM package configuration for Fedora/RHEL/CentOS
+[package.metadata.generate-rpm]
+name = "tuiworker"
+license = "MIT"
+summary = "A terminal user interface (TUI) workstation application"
+description = """
+TUIWorker is a Rust-based terminal workstation application providing
+a unified and efficient command-line working environment with modular
+features including file manager, todo list, notes, diary, music player,
+and more.
+"""
+assets = [
+  { source = "target/release/tuiworker", dest = "/usr/bin/", mode = "755" },
+  { source = "../../README.md", dest = "/usr/share/doc/tuiworker/", mode = "644", doc = true },
+  { source = "../../LICENSE", dest = "/usr/share/licenses/tuiworker/", mode = "644" },
+]
 
 [features]
 default = ["music", "git", "terminal"]
