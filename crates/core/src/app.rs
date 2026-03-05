@@ -536,9 +536,7 @@ impl App {
 
     fn draw_status_bar(&mut self, frame: &mut ratatui::prelude::Frame, area: Rect) {
         let status = if let Some(module) = self.modules.get(self.active_module_index) {
-            let s = module.get_status();
-            log::info!("Status bar (module {}): {}", module.name(), s);
-            s
+            module.get_status()
         } else {
             self.status_message.clone()
         };
