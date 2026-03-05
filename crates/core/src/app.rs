@@ -253,25 +253,31 @@ impl App {
                         ))));
                     }
                     crossterm::event::KeyCode::Right => {
-                        if self.modules.is_empty() {
-                            return Ok(None);
+                        if key.modifiers == crossterm::event::KeyModifiers::CONTROL {
+                            if self.modules.is_empty() {
+                                return Ok(None);
+                            }
+                            self.active_module_index =
+                                (self.active_module_index + 1) % self.modules.len();
+                            let module_name =
+                                self.modules[self.active_module_index].name().to_string();
+                            return Ok(Some(Action::SwitchModule(module_name)));
                         }
-                        self.active_module_index =
-                            (self.active_module_index + 1) % self.modules.len();
-                        let module_name = self.modules[self.active_module_index].name().to_string();
-                        return Ok(Some(Action::SwitchModule(module_name)));
                     }
                     crossterm::event::KeyCode::Left => {
-                        if self.modules.is_empty() {
-                            return Ok(None);
+                        if key.modifiers == crossterm::event::KeyModifiers::CONTROL {
+                            if self.modules.is_empty() {
+                                return Ok(None);
+                            }
+                            if self.active_module_index == 0 {
+                                self.active_module_index = self.modules.len() - 1;
+                            } else {
+                                self.active_module_index -= 1;
+                            }
+                            let module_name =
+                                self.modules[self.active_module_index].name().to_string();
+                            return Ok(Some(Action::SwitchModule(module_name)));
                         }
-                        if self.active_module_index == 0 {
-                            self.active_module_index = self.modules.len() - 1;
-                        } else {
-                            self.active_module_index -= 1;
-                        }
-                        let module_name = self.modules[self.active_module_index].name().to_string();
-                        return Ok(Some(Action::SwitchModule(module_name)));
                     }
                     _ => {}
                 }
@@ -503,7 +509,7 @@ impl App {
             }
         }
 
-        let help_text = "[?] Help | [l] Logs Ctrl↓↑ | [q] Quit";
+        let help_text = "[?] Help | [l] Logs Ctrl↓↑ | Ctrl+←/→: Switch | [q] Quit";
 
         let paragraph = Paragraph::new(help_text)
             .alignment(Alignment::Right)
