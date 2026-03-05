@@ -14,10 +14,6 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: ubuntu-20.04
-            target: x86_64-unknown-linux-gnu
-            artifact_suffix: linux-glibc2.31
-
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             artifact_suffix: linux-glibc2.35
@@ -25,7 +21,7 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             artifact_suffix: linux-glibc2.39
-          
+
           - os: macos-latest
             target: x86_64-apple-darwin
             artifact_suffix: macos-x86_64
