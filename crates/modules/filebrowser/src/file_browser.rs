@@ -1183,23 +1183,33 @@ impl FileBrowser {
     }
 
     pub fn get_status(&self) -> String {
-        if let Some(ref file_path) = self.selected_file_path {
-            let file_name = std::path::Path::new(file_path)
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or(file_path);
+        if self.file_content.is_some() {
+            if let Some(ref file_path) = self.selected_file_path {
+                let file_name = std::path::Path::new(file_path)
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or(file_path);
 
-            if self.file_content.is_some() {
                 let current_line = self.content_scroll_offset + 1;
-                if let Some(content) = &self.file_content {
-                    let total_lines = content.lines().count();
-                    format!("{}: Line {} / {}", file_name, current_line, total_lines)
-                } else {
-                    format!("{}", file_name)
-                }
+                let total_lines = self
+                    .file_content
+                    .as_ref()
+                    .map(|c| c.lines().count())
+                    .unwrap_or(0);
+
+                format!("{}: Line {} / {}", file_name, current_line, total_lines)
             } else {
-                format!("{}", file_name)
+                "Opened File".to_string()
             }
+        } else if self.selected_file_path.is_some() {
+            self.selected_file_path
+                .as_ref()
+                .and_then(|p| {
+                    std::path::Path::new(p)
+                        .file_name()
+                        .and_then(|n| n.to_str().map(String::from))
+                })
+                .unwrap_or_else(|| self.selected_file_path.as_ref().unwrap().clone())
         } else if let Some(entry) = self.get_selected() {
             entry.name.clone()
         } else {
