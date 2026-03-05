@@ -13,7 +13,7 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            target: x86_64-unknown-linux-musl
+            target: x86_64-unknown-linux-gnu
             artifact_suffix: linux
           - os: macos-latest
             target: x86_64-apple-darwin
@@ -30,12 +30,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Install musl for static linking (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y musl-tools musl-dev
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -55,44 +49,13 @@ jobs:
           path: ~/.cargo/git
           key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Cache cargo build
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Build
-        shell: bash
-        run: |
-          if [ "${{ matrix.target }}" = "x86_64-unknown-linux-musl" ]; then
-            echo "Building static musl binary"
-
-            # Temporarily remove C-dependent modules from workspace
-            cp Cargo.toml Cargo.toml.backup
-            sed -i -e '/^    "crates\/modules\/mail",$/d' \
-                   -e '/^    "crates\/modules\/git",$/d' \
-                   -e '/^    "crates\/modules\/terminal",$/d' \
-                   -e '/^    "crates\/modules\/music",$/d' \
-                   -e '/^    "crates\/modules\/project",$/d' \
-                   Cargo.toml
-
-            # Static linking for Linux using musl
-            export RUSTFLAGS="-C target-feature=+crt-static -C link-arg=-s"
-
-            cargo build --release --target ${{ matrix.target }} \
-              --no-default-features \
-              --features "static-build"
-
-            # Restore workspace configuration
-            mv Cargo.toml.backup Cargo.toml
-          else
-            echo "Building dynamic binary with all features"
-            cargo build --release --target ${{ matrix.target }}
-          fi
-
       - name: Run tests
         run: |
           cargo test --target ${{ matrix.target }} --verbose
+
+      - name: Build
+        run: |
+          cargo build --release --target ${{ matrix.target }}
 
       - name: Upload binary (Unix)
         if: runner.os != 'Windows'
