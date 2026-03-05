@@ -6,37 +6,34 @@ on:
   pull_request:
     branches: [main, master]
   workflow_dispatch:
+  release:
+    types: [published]
 
 jobs:
   build:
     strategy:
       matrix:
         include:
-          # Core version - musl static, all Linux
           - os: ubuntu-latest
             target: x86_64-unknown-linux-musl
             artifact_suffix: linux-static
             features: --no-default-features
           
-          # Full version 1 - Ubuntu 20.04 (GLIBC 2.31) - broader compatibility
           - os: ubuntu-20.04
             target: x86_64-unknown-linux-gnu
             artifact_suffix: linux-glibc2.31
             features: --default-features
           
-          # Full version 2 - Ubuntu 22.04 (GLIBC 2.35) - moderate compatibility
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             artifact_suffix: linux-glibc2.35
             features: --default-features
           
-          # Full version 3 - Ubuntu 24.04 (GLIBC 2.39) - latest systems
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            artifact_suffix: linux-glibc2.39
+            artifact_suffix: linux-glc2.39
             features: --default-features
           
-          # macOS
           - os: macos-latest
             target: x86_64-apple-darwin
             artifact_suffix: macos-x86_64
@@ -47,7 +44,6 @@ jobs:
             artifact_suffix: macos-arm64
             features: --default-features
           
-          # Windows
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             artifact_suffix: windows
@@ -55,6 +51,9 @@ jobs:
 
     runs-on: ${{ matrix.os }}
 
+    permissions:
+      contents: write
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -77,25 +76,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev libasound2-dev
 
-      - name: Cache cargo registry
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Cache cargo index
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/git
-          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
-
       - name: Run tests
         run: |
           if [ "${{ matrix.target }}" = "x86_64-unknown-linux-musl" ]; then
-            # For static build, only test core packages
             cargo test -p core -p logging -p storage -p filebrowser -p todo --target ${{ matrix.target }} --verbose
           else
-            # For dynamic build, test all packages
             cargo test --target ${{ matrix.target }} --verbose
           fi
 
@@ -109,6 +94,14 @@ jobs:
             cross build --release --target ${{ matrix.target }}
           fi
 
+      - name: Get version
+        id: version
+        shell: bash
+        run: |
+          VERSION=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "// v\(.*\) = \(.*\)/\2/' | tr -d '"')
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          echo "version=${VERSION}"
+          
       - name: Upload binary (Unix)
         if: runner.os != 'Windows'
         uses: actions/upload-artifact@v4
@@ -124,3 +117,35 @@ jobs:
           name: binary-${{ matrix.artifact_suffix }}
           path: target/${{ matrix.target }}/release/tuiworker.exe
           retention-days: 30
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release' && github.event.action == 'published'
+    
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          
+      - name: Display artifacts
+        run: |
+          echo "Downloaded artifacts:"
+          ls -lh artifacts/
+          
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: artifacts/binary-*/tuiworker*
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: true
+          token: ${{ secrets.GITHUB_TOKEN }}
