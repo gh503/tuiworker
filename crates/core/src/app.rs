@@ -419,7 +419,7 @@ impl App {
     }
 
     fn draw_app_bar(&mut self, frame: &mut ratatui::prelude::Frame, area: Rect) {
-        let left_width = 30;
+        let left_width = 60;
         let right_width = 40;
         let middle_width = area.width.saturating_sub(left_width + right_width);
 
@@ -444,7 +444,7 @@ impl App {
         let total_modules = modules_list.len();
 
         let display_count = if total_modules > 0 {
-            (left_width as usize / 4).min(total_modules.max(1))
+            (left_width as usize / 12.max(1)).min(total_modules.max(1))
         } else {
             1
         };
@@ -472,12 +472,11 @@ impl App {
                 let module_index = i;
                 let is_active = module_index == self.active_module_index;
                 let title = modules_list[module_index].clone();
-                let title_len = title.len();
 
                 let button_text = if is_active {
-                    format!("[{}]", &title[0..title_len.min(1)].to_uppercase())
+                    format!("[{}]", title)
                 } else {
-                    format!(" {} ", &title[0..title_len.min(2)])
+                    format!(" {} ", title)
                 };
 
                 let button_width = button_text.len() as u16;
