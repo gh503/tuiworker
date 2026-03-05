@@ -340,20 +340,22 @@ impl FileBrowser {
             })
             .collect();
 
-        let border_style = if is_active {
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD)
+        let (border_style, title_style, bg_style) = if is_active {
+            (
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+                Style::default().bg(Color::DarkGray),
+            )
         } else {
-            self.theme.border()
-        };
-
-        let title_style = if is_active {
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD)
-        } else {
-            Style::default().fg(Color::Gray)
+            (
+                self.theme.border(),
+                Style::default().fg(Color::Gray),
+                Style::default().bg(Color::Black),
+            )
         };
 
         let list = List::new(items)
@@ -362,7 +364,8 @@ impl FileBrowser {
                     .title(format!("Files: {}", self.current_path.display()))
                     .borders(Borders::ALL)
                     .border_style(border_style)
-                    .title_style(title_style),
+                    .title_style(title_style)
+                    .style(bg_style),
             )
             .highlight_style(self.theme.highlight());
 
@@ -451,20 +454,22 @@ impl FileBrowser {
             lines.push(Line::from("No file selected"));
         }
 
-        let border_style = if is_active {
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD)
+        let (border_style, title_style, bg_style) = if is_active {
+            (
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+                Style::default().bg(Color::DarkGray),
+            )
         } else {
-            self.theme.border()
-        };
-
-        let title_style = if is_active {
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD)
-        } else {
-            Style::default().fg(Color::Gray)
+            (
+                self.theme.border(),
+                Style::default().fg(Color::Gray),
+                Style::default().bg(Color::Black),
+            )
         };
 
         let paragraph = Paragraph::new(lines)
@@ -473,7 +478,8 @@ impl FileBrowser {
                     .title("Info")
                     .borders(Borders::ALL)
                     .border_style(border_style)
-                    .title_style(title_style),
+                    .title_style(title_style)
+                    .style(bg_style),
             )
             .alignment(Alignment::Left);
 
@@ -481,20 +487,22 @@ impl FileBrowser {
     }
 
     fn render_file_content(&self, frame: &mut Frame, area: Rect, is_active: bool) {
-        let border_style = if is_active {
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD)
+        let (border_style, title_style, bg_style) = if is_active {
+            (
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+                Style::default().bg(Color::DarkGray),
+            )
         } else {
-            self.theme.border()
-        };
-
-        let title_style = if is_active {
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD)
-        } else {
-            Style::default().fg(Color::Gray)
+            (
+                self.theme.border(),
+                Style::default().fg(Color::Gray),
+                Style::default().bg(Color::Black),
+            )
         };
 
         if let Some(ref content) = self.file_content {
@@ -524,7 +532,8 @@ impl FileBrowser {
                         ))
                         .borders(Borders::ALL)
                         .border_style(border_style)
-                        .title_style(title_style),
+                        .title_style(title_style)
+                        .style(bg_style),
                 )
                 .alignment(Alignment::Left);
 
@@ -536,7 +545,8 @@ impl FileBrowser {
                         .title("File Content")
                         .borders(Borders::ALL)
                         .border_style(border_style)
-                        .title_style(title_style),
+                        .title_style(title_style)
+                        .style(bg_style),
                 )
                 .alignment(Alignment::Left);
             frame.render_widget(paragraph, area);
