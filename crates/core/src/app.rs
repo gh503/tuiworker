@@ -374,37 +374,30 @@ impl App {
 
         let top_section = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(top_section_height), Constraint::Min(1)])
-            .split(size);
-
-        let app_bar_area = top_section[0];
-        let content_area = top_section[1];
-
-        let content_split = Layout::default()
-            .direction(Direction::Vertical)
             .constraints([
+                Constraint::Length(top_section_height),
                 Constraint::Min(min_content_height),
                 Constraint::Length(status_bar_height),
             ])
-            .split(content_area);
+            .split(size);
 
-        let work_log_area = content_split[0];
-        let status_bar_area = content_split[1];
+        let app_bar_area = top_section[0];
+        let main_content_area = top_section[1];
+        let status_bar_area = top_section[2];
 
         let (work_area, log_area) = if !self.log_panel_collapsed {
             let log_constraint = Constraint::Length(self.log_panel_height);
             let work_log_split = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints([Constraint::Min(min_content_height), log_constraint])
-                .split(work_log_area);
+                .constraints([Constraint::Min(3), log_constraint])
+                .split(main_content_area);
             (work_log_split[0], Some(work_log_split[1]))
         } else {
-            (work_log_area, None)
+            (main_content_area, None)
         };
 
         self.draw_app_bar(frame, app_bar_area);
         self.draw_work_area(frame, work_area);
-        self.draw_status_bar(frame, status_bar_area);
 
         if let Some(log_area) = log_area {
             self.log_panel_area = Some(log_area);
@@ -412,6 +405,8 @@ impl App {
         } else {
             self.log_panel_area = None;
         }
+
+        self.draw_status_bar(frame, status_bar_area);
 
         if self.dialog_visible {
             self.draw_dialog(frame, size);

@@ -28,6 +28,7 @@ pub struct FileBrowser {
     split_ratio: f32,
     dragging_split: bool,
     content_scroll_offset: usize,
+    content_scroll_offset_x: usize,
     info_scroll_offset: usize,
     active_area: ActiveArea,
     search_mode: bool,
@@ -69,6 +70,7 @@ impl FileBrowser {
             split_ratio: 0.4,
             dragging_split: false,
             content_scroll_offset: 0,
+            content_scroll_offset_x: 0,
             info_scroll_offset: 0,
             active_area: ActiveArea::FileList,
             search_mode: false,
@@ -649,6 +651,7 @@ impl FileBrowser {
 
             let search_highlight = !self.content_search_query.is_empty();
             let query_lower = self.content_search_query.to_lowercase();
+            let scroll_x = self.content_scroll_offset_x;
 
             let visible_lines_with_line_numbers: Vec<Line> = lines
                 .iter()
@@ -662,16 +665,20 @@ impl FileBrowser {
                     if search_highlight && line.to_lowercase().contains(&query_lower) {
                         let highlighted_line =
                             Self::highlight_text(line, &self.content_search_query);
+                        let cropped_content: Vec<Span> =
+                            highlighted_line.into_iter().skip(scroll_x).collect();
+
                         let mut spans = vec![Span::styled(
                             line_num_str,
                             Style::default().fg(Color::DarkGray),
                         )];
-                        spans.extend(highlighted_line);
+                        spans.extend(cropped_content);
                         Line::from(spans)
                     } else {
+                        let cropped_line = line.chars().skip(scroll_x).collect::<String>();
                         Line::from(vec![
                             Span::styled(line_num_str, Style::default().fg(Color::DarkGray)),
-                            Span::raw(line.clone()),
+                            Span::raw(cropped_line),
                         ])
                     }
                 })
@@ -1087,6 +1094,7 @@ impl FileBrowser {
             KeyCode::Home => {
                 if self.active_area == ActiveArea::Content && self.file_content.is_some() {
                     self.content_scroll_offset = 0;
+                    self.content_scroll_offset_x = 0;
                     Action::Consumed
                 } else {
                     self.selected_index = 0;
@@ -1102,6 +1110,24 @@ impl FileBrowser {
                 } else {
                     self.selected_index = self.entries.len().saturating_sub(1);
                     Action::Consumed
+                }
+            }
+            KeyCode::Left => {
+                if self.active_area == ActiveArea::Content && self.file_content.is_some() {
+                    if self.content_scroll_offset_x > 0 {
+                        self.content_scroll_offset_x -= 1;
+                    }
+                    Action::Consumed
+                } else {
+                    Action::None
+                }
+            }
+            KeyCode::Right => {
+                if self.active_area == ActiveArea::Content && self.file_content.is_some() {
+                    self.content_scroll_offset_x += 1;
+                    Action::Consumed
+                } else {
+                    Action::None
                 }
             }
             KeyCode::Enter => {
