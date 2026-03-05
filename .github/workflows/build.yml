@@ -87,7 +87,7 @@ jobs:
         id: version
         shell: bash
         run: |
-          VERSION=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "// v\(.*\) = \(.*\)/\2/' | tr -d '"')
+          VERSION=$(grep '^version = ' Cargo.toml | head -1 | awk -F'"' '{print $2}')
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
           echo "version=${VERSION}"
           
