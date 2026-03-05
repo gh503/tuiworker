@@ -29,6 +29,7 @@ pub struct FileBrowser {
     dragging_split: bool,
     content_scroll_offset: usize,
     info_scroll_offset: usize,
+    active_area: ActiveArea,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -36,6 +37,12 @@ enum SortBy {
     Name,
     Size,
     Modified,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum ActiveArea {
+    FileList,
+    Content,
 }
 
 impl FileBrowser {
@@ -56,8 +63,8 @@ impl FileBrowser {
             dragging_split: false,
             content_scroll_offset: 0,
             info_scroll_offset: 0,
+            active_area: ActiveArea::FileList,
         };
-
         let _ = browser.refresh();
         browser
     }
@@ -628,11 +635,25 @@ impl FileBrowser {
             KeyCode::Esc | KeyCode::Char('c') => {
                 if self.file_content.is_some() {
                     self.close_file();
+                    self.active_area = ActiveArea::FileList;
                 }
                 Action::None
             }
+            KeyCode::Tab => {
+                self.active_area = match self.active_area {
+                    ActiveArea::FileList => {
+                        if self.file_content.is_some() {
+                            ActiveArea::Content
+                        } else {
+                            ActiveArea::FileList
+                        }
+                    }
+                    ActiveArea::Content => ActiveArea::FileList,
+                };
+                Action::Consumed
+            }
             KeyCode::Up | KeyCode::Char('k') => {
-                if self.file_content.is_some() {
+                if self.active_area == ActiveArea::Content && self.file_content.is_some() {
                     if self.content_scroll_offset > 0 {
                         self.content_scroll_offset -= 1;
                     }
@@ -645,12 +666,10 @@ impl FileBrowser {
                 }
             }
             KeyCode::Down | KeyCode::Char('j') => {
-                if self.file_content.is_some() {
+                if self.active_area == ActiveArea::Content && self.file_content.is_some() {
                     if let Some(ref content) = self.file_content {
-                        let max_offset = content.lines().count().saturating_sub(1);
-                        if self.content_scroll_offset < max_offset {
-                            self.content_scroll_offset += 1;
-                        }
+                        self.content_scroll_offset =
+                            (self.content_scroll_offset + 1).min(content.lines().count() - 1);
                     }
                     Action::Consumed
                 } else {
@@ -661,7 +680,7 @@ impl FileBrowser {
                 }
             }
             KeyCode::PageUp => {
-                if self.file_content.is_some() {
+                if self.active_area == ActiveArea::Content && self.file_content.is_some() {
                     let page_size = 20;
                     self.content_scroll_offset = self.content_scroll_offset.saturating_sub(page_size);
                     Action::Consumed
@@ -672,7 +691,7 @@ impl FileBrowser {
                 }
             }
             KeyCode::PageDown => {
-                if self.file_content.is_some() {
+                if self.active_area == ActiveArea::Content && self.file_content.is_some() {
                     let page_size = 20;
                     if let Some(ref content) = self.file_content {
                         let max_offset = content.lines().count().saturating_sub(1);
@@ -687,7 +706,7 @@ impl FileBrowser {
                 }
             }
             KeyCode::Home => {
-                if self.file_content.is_some() {
+                if self.active_area == ActiveArea::Content && self.file_content.is_some() {
                     self.content_scroll_offset = 0;
                     Action::Consumed
                 } else {
@@ -696,7 +715,7 @@ impl FileBrowser {
                 }
             }
             KeyCode::End => {
-                if self.file_content.is_some() {
+                if self.active_area == ActiveArea::Content && self.file_content.is_some() {
                     if let Some(ref content) = self.file_content {
                         self.content_scroll_offset = content.lines().count().saturating_sub(1);
                     }
@@ -740,17 +759,14 @@ impl FileBrowser {
             }
             KeyCode::Char('h') => {
                 self.toggle_hidden();
-                Action::ShowMessage(core::event::Message::Info(format!(
-                    "Hidden files now: {}",
-                    if self.show_hidden { "shown" } else { "hidden" }
-                )))
+                Action::Consumed
             }
             KeyCode::Char('s') => {
                 self.toggle_sort();
                 Action::Consumed
             }
             KeyCode::Char('?') => Action::ShowMessage(core::event::Message::Info(
-                "j/k: Navigate | Enter: Enter dir | o: Open | c: Close file | Esc: Close file | h: Toggle hidden | s: Sort | u: Up"
+                "j/k: Navigate | Enter: Enter dir | o: Open | c: Close file | Esc: Close file | h: Toggle hidden | s: Sort | u: Up | Tab: Switch focus"
                     .to_string(),
             )),
             _ => Action::None,
@@ -782,6 +798,10 @@ impl FileBrowser {
             Shortcut {
                 key: "s",
                 description: "Toggle sort",
+            },
+            Shortcut {
+                key: "Tab",
+                description: "Switch focus",
             },
         ]
     }
