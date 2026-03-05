@@ -316,46 +316,42 @@ impl FileBrowser {
         let split_x = area.x + (area.width as f32 * self.split_ratio) as u16;
         let split_x = split_x.max(area.x + 10).min(area.x + area.width - 10);
 
-        let search_height = if self.search_mode { 1 } else { 0 };
+        let search_bar_height = if self.search_mode { 1 } else { 0 };
 
         let files_area = Rect {
             x: area.x,
             y: area.y,
             width: split_x - area.x,
-            height: area.height.saturating_sub(search_height),
-        };
-
-        let search_bar_area = if self.search_mode {
-            Some(Rect {
-                x: area.x,
-                y: area.y + files_area.height,
-                width: split_x - area.x,
-                height: 1,
-            })
-        } else {
-            None
+            height: area.height.saturating_sub(search_bar_height),
         };
 
         let split_bar_area = Rect {
             x: split_x,
             y: area.y,
             width: 1,
-            height: area.height,
+            height: area.height.saturating_sub(search_bar_height),
         };
 
         let info_area = Rect {
             x: split_x + 1,
             y: area.y,
             width: area.width - (split_x - area.x) - 1,
-            height: area.height,
+            height: area.height.saturating_sub(search_bar_height),
         };
 
         self.render_file_list(frame, files_area, self.active_area == ActiveArea::FileList);
-        if let Some(search_area) = search_bar_area {
-            self.render_search_bar(frame, search_area);
-        }
         self.render_split_bar(frame, split_bar_area);
         self.render_info_panel(frame, info_area, self.active_area == ActiveArea::Content);
+
+        if self.search_mode {
+            let search_bar_area = Rect {
+                x: area.x,
+                y: area.y + area.height - 1,
+                width: split_x - area.x,
+                height: 1,
+            };
+            self.render_search_bar(frame, search_bar_area);
+        }
     }
 
     fn render_search_bar(&self, frame: &mut Frame, area: Rect) {
