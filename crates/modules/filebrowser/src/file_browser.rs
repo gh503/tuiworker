@@ -112,8 +112,20 @@ impl FileBrowser {
             }
         }
 
-        directories.sort_by_key(|e| e.name.clone());
-        files.sort_by_key(|e| e.name.clone());
+        match self.sort_by {
+            SortBy::Name => {
+                directories.sort_by_key(|e| e.name.to_lowercase());
+                files.sort_by_key(|e| e.name.to_lowercase());
+            }
+            SortBy::Size => {
+                directories.sort_by_key(|e| e.size);
+                files.sort_by_key(|e| e.size);
+            }
+            SortBy::Modified => {
+                directories.sort_by_key(|e| e.modified);
+                files.sort_by_key(|e| e.modified);
+            }
+        }
 
         entries.extend(directories);
         entries.extend(files);
@@ -743,7 +755,8 @@ impl FileBrowser {
             KeyCode::PageUp => {
                 if self.active_area == ActiveArea::Content && self.file_content.is_some() {
                     let page_size = 20;
-                    self.content_scroll_offset = self.content_scroll_offset.saturating_sub(page_size);
+                    self.content_scroll_offset =
+                        self.content_scroll_offset.saturating_sub(page_size);
                     Action::Consumed
                 } else {
                     let page_size = 10;
@@ -756,7 +769,8 @@ impl FileBrowser {
                     let page_size = 20;
                     if let Some(ref content) = self.file_content {
                         let max_offset = content.lines().count().saturating_sub(1);
-                        self.content_scroll_offset = (self.content_scroll_offset + page_size).min(max_offset);
+                        self.content_scroll_offset =
+                            (self.content_scroll_offset + page_size).min(max_offset);
                     }
                     Action::Consumed
                 } else {
@@ -787,9 +801,7 @@ impl FileBrowser {
                 }
             }
             KeyCode::Enter => {
-                let entry_info = self
-                    .get_selected()
-                    .map(|entry| entry.is_dir);
+                let entry_info = self.get_selected().map(|entry| entry.is_dir);
 
                 if let Some(is_dir) = entry_info {
                     if is_dir {
@@ -826,10 +838,16 @@ impl FileBrowser {
                 self.toggle_sort();
                 Action::Consumed
             }
-            KeyCode::Char('?') => Action::ShowMessage(core::event::Message::Info(
-                "j/k: Navigate | Enter: Enter dir | o: Open | c: Close file | Esc: Close file | h: Toggle hidden | s: Sort | u: Up | Tab: Switch focus"
-                    .to_string(),
-            )),
+            KeyCode::Char('?') => {
+                let sort_mode = match self.sort_by {
+                    SortBy::Name => "name",
+                    SortBy::Size => "size",
+                    SortBy::Modified => "modified",
+                };
+                Action::ShowMessage(core::event::Message::Info(
+                    format!("j/k: Navigate | Enter: Enter dir | o: Open | c: Close file | Esc: Close file | h: Toggle hidden | s: Sort ({}) | u: Up | Tab: Switch focus", sort_mode)
+                ))
+            }
             _ => Action::None,
         }
     }
