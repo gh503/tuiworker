@@ -18,6 +18,9 @@ members = [
 ]
 resolver = "2"
 
+[workspace.metadata.static-build]
+exclude-members = ["mail", "git", "terminal", "music", "project"]
+
 [workspace.package]
 version = "0.1.0"
 edition = "2021"

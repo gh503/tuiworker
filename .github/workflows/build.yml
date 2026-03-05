@@ -66,18 +66,27 @@ jobs:
         run: |
           if [ "${{ matrix.target }}" = "x86_64-unknown-linux-musl" ]; then
             echo "Building static musl binary"
+
+            # Temporarily remove C-dependent modules from workspace
+            cp Cargo.toml Cargo.toml.backup
+            sed -i -e '/^    "crates\/modules\/mail",$/d' \
+                   -e '/^    "crates\/modules\/git",$/d' \
+                   -e '/^    "crates\/modules\/terminal",$/d' \
+                   -e '/^    "crates\/modules\/music",$/d' \
+                   -e '/^    "crates\/modules\/project",$/d' \
+                   Cargo.toml
+
             # Static linking for Linux using musl
-            # Use vendored OpenSSL for TLS dependencies
-            export OPENSSL_NO_VENDOR=1
-            export OPENSSL_STATIC=1
-            export OPENSSL_DIR=/usr
             export RUSTFLAGS="-C target-feature=+crt-static -C link-arg=-s"
 
-            # Build core modules only (exclude C-dependent modules)
             cargo build --release --target ${{ matrix.target }} \
-              --no-default-features
+              --no-default-features \
+              --features "static-build"
+
+            # Restore workspace configuration
+            mv Cargo.toml.backup Cargo.toml
           else
-            echo "Building dynamic binary"
+            echo "Building dynamic binary with all features"
             cargo build --release --target ${{ matrix.target }}
           fi
 
