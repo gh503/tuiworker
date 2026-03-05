@@ -2,6 +2,7 @@ use anyhow::Result;
 use chrono::Local;
 use fern;
 use log::{Level, LevelFilter};
+use std::env;
 use std::path::PathBuf;
 
 /// 应用程序配置中的日志部分
@@ -14,14 +15,25 @@ pub struct LogConfig {
 
 impl Default for LogConfig {
     fn default() -> Self {
-        Self {
-            log_level: "info".to_string(),
-            log_to_file: true,
-            log_file: dirs::cache_dir()
+        let log_dir = if cfg!(target_os = "linux") {
+            PathBuf::from(env::var("HOME").unwrap_or_else(|_| ".".to_string()))
+                .join(".local")
+                .join("share")
+                .join("tuiworker")
+                .join("logs")
+        } else {
+            dirs::cache_dir()
                 .unwrap_or_else(|| PathBuf::from("."))
                 .join("tui-workstation")
                 .join("logs")
-                .join("app.log"),
+        };
+
+        let _ = std::fs::create_dir_all(&log_dir);
+
+        Self {
+            log_level: "info".to_string(),
+            log_to_file: true,
+            log_file: log_dir.join("app.log"),
         }
     }
 }
