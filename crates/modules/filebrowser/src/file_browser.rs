@@ -400,12 +400,7 @@ impl FileBrowser {
         };
 
         let paragraph = Paragraph::new(match_info)
-            .style(Style::default().fg(Color::Yellow).bg(Color::DarkGray))
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .border_style(Style::default().fg(Color::Yellow)),
-            );
+            .style(Style::default().fg(Color::Yellow).bg(Color::DarkGray));
 
         frame.render_widget(paragraph, area);
     }
