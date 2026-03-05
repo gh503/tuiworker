@@ -670,6 +670,13 @@ impl FileBrowser {
                     let line_num = idx + 1;
                     let line_num_str = format!("{:4} ", line_num);
 
+                    // Line number color - use lighter color when active panel has dark background
+                    let line_num_color = if is_active {
+                        Color::Cyan
+                    } else {
+                        Color::DarkGray
+                    };
+
                     if search_highlight && line.to_lowercase().contains(&query_lower) {
                         let highlighted_line =
                             Self::highlight_text(line, &self.content_search_query);
@@ -678,14 +685,14 @@ impl FileBrowser {
 
                         let mut spans = vec![Span::styled(
                             line_num_str,
-                            Style::default().fg(Color::DarkGray),
+                            Style::default().fg(line_num_color),
                         )];
                         spans.extend(cropped_content);
                         Line::from(spans)
                     } else {
                         let cropped_line = line.chars().skip(scroll_x).collect::<String>();
                         Line::from(vec![
-                            Span::styled(line_num_str, Style::default().fg(Color::DarkGray)),
+                            Span::styled(line_num_str, Style::default().fg(line_num_color)),
                             Span::raw(cropped_line),
                         ])
                     }
