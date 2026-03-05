@@ -4,7 +4,7 @@ use log;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Position, Rect},
     style::{Color, Modifier, Style},
-    text::{Line, Span},
+    text::{Line, Span, Text},
     widgets::{Block, Borders, List, ListItem, Paragraph},
     Frame,
 };
@@ -689,6 +689,10 @@ impl FileBrowser {
                         Color::DarkGray
                     };
 
+                    // Calculate absolute byte position for this line
+                    let line_start_byte =
+                        self.calculate_line_start_byte(lines, idx + scroll_offset);
+
                     if search_highlight && line.to_lowercase().contains(&query_lower) {
                         let highlighted_line =
                             Self::highlight_text(line, &self.content_search_query);
@@ -701,6 +705,34 @@ impl FileBrowser {
                         )];
                         spans.extend(cropped_content);
                         Line::from(spans)
+                    } else if let Some((sel_start, sel_end)) = self.text_selection {
+                        let start = sel_start.min(sel_end);
+                        let end = sel_end.max(sel_start);
+                        let line_end_byte = line_start_byte + line.as_bytes().len();
+
+                        // Check if this line has any selected text
+                        if line_end_byte > start && line_start_byte <= end {
+                            let visible_line_spans = self.render_line_with_selection(
+                                line,
+                                line_start_byte,
+                                start.min(line_end_byte),
+                                end.max(line_start_byte),
+                                scroll_x,
+                                is_active,
+                            );
+                            let mut spans = vec![Span::styled(
+                                line_num_str,
+                                Style::default().fg(line_num_color),
+                            )];
+                            spans.extend(visible_line_spans);
+                            Line::from(spans)
+                        } else {
+                            let cropped_line = line.chars().skip(scroll_x).collect::<String>();
+                            Line::from(vec![
+                                Span::styled(line_num_str, Style::default().fg(line_num_color)),
+                                Span::raw(cropped_line),
+                            ])
+                        }
                     } else {
                         let cropped_line = line.chars().skip(scroll_x).collect::<String>();
                         Line::from(vec![
@@ -1383,6 +1415,55 @@ impl FileBrowser {
         }
 
         byte_pos.min(content.len())
+    }
+
+    fn calculate_line_start_byte(&self, lines: &[&str], line_idx: usize) -> usize {
+        lines.iter().take(line_idx).map(|l| l.len() + 1).sum()
+    }
+
+    fn render_line_with_selection(
+        &self,
+        line: &str,
+        line_start_byte: usize,
+        sel_start: usize,
+        sel_end: usize,
+        scroll_x: usize,
+        is_active: bool,
+    ) -> Vec<Span> {
+        let mut result = Vec::new();
+        let chars: Vec<char> = line.chars().collect();
+
+        let selection_bg = if is_active {
+            Color::Green
+        } else {
+            Color::DarkGray
+        };
+
+        let mut current_byte = line_start_byte;
+
+        for ch in &chars {
+            let char_byte_len = ch.len_utf8();
+            let char_end_byte = current_byte + char_byte_len;
+            let is_selected = char_end_byte > sel_start && current_byte < sel_end;
+
+            if is_selected {
+                result.push(Span::styled(
+                    ch.to_string(),
+                    Style::default().bg(selection_bg),
+                ));
+            } else {
+                result.push(Span::raw(ch.to_string()));
+            }
+
+            current_byte = char_end_byte;
+        }
+
+        if scroll_x > 0 {
+            let chars_to_skip = chars.len().min(scroll_x);
+            result = result.into_iter().skip(chars_to_skip).collect();
+        }
+
+        result
     }
 
     pub fn get_selected_text(&self) -> Option<String> {
