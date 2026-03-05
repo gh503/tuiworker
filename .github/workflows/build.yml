@@ -136,17 +136,19 @@ jobs:
           ls -lh artifacts/
 
       - name: Build deb package
+        working-directory: ./src
         run: |
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev libasound2-dev
           cargo install cargo-deb
           cargo build --release
-          cargo deb -p tuiworker --no-build
+          cargo deb --no-build
 
       - name: Build rpm package
+        working-directory: ./src
         run: |
           cargo install cargo-generate-rpm
-          cargo generate-rpm -p tuiworker
+          cargo generate-rpm --output=target/rpm/tuiworker.rpm
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v1
