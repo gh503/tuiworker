@@ -27,6 +27,11 @@ pub trait Module {
     /// 模块快捷键列表（用于帮助显示）
     fn shortcuts(&self) -> Vec<Shortcut>;
 
+    /// 获取模块状态字符串（用于状态栏显示）
+    fn get_status(&self) -> String {
+        self.title().to_string()
+    }
+
     /// 模块初始化（首次激活时调用）
     fn init(&mut self) -> anyhow::Result<()> {
         Ok(())

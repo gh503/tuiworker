@@ -532,7 +532,13 @@ impl App {
     }
 
     fn draw_status_bar(&mut self, frame: &mut ratatui::prelude::Frame, area: Rect) {
-        let paragraph = Paragraph::new(self.status_message.clone())
+        let status = if let Some(module) = self.modules.get(self.active_module_index) {
+            module.get_status()
+        } else {
+            self.status_message.clone()
+        };
+
+        let paragraph = Paragraph::new(status)
             .style(Style::default().fg(Color::White).bg(Color::Black))
             .alignment(Alignment::Center);
         frame.render_widget(paragraph, area);

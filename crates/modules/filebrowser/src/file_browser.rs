@@ -650,23 +650,34 @@ impl FileBrowser {
             let search_highlight = !self.content_search_query.is_empty();
             let query_lower = self.content_search_query.to_lowercase();
 
-            let visible_lines: Vec<Line> = lines
+            let visible_lines_with_line_numbers: Vec<Line> = lines
                 .iter()
                 .enumerate()
                 .skip(scroll_offset)
                 .take(available_height)
                 .map(|(idx, line)| {
+                    let line_num = idx + 1;
+                    let line_num_str = format!("{:4} ", line_num);
+
                     if search_highlight && line.to_lowercase().contains(&query_lower) {
                         let highlighted_line =
                             Self::highlight_text(line, &self.content_search_query);
-                        Line::from(highlighted_line)
+                        let mut spans = vec![Span::styled(
+                            line_num_str,
+                            Style::default().fg(Color::DarkGray),
+                        )];
+                        spans.extend(highlighted_line);
+                        Line::from(spans)
                     } else {
-                        Line::from(line.clone())
+                        Line::from(vec![
+                            Span::styled(line_num_str, Style::default().fg(Color::DarkGray)),
+                            Span::raw(line.clone()),
+                        ])
                     }
                 })
                 .collect();
 
-            let paragraph = Paragraph::new(visible_lines)
+            let paragraph = Paragraph::new(visible_lines_with_line_numbers)
                 .block(
                     Block::default()
                         .title(format!(
@@ -1142,6 +1153,31 @@ impl FileBrowser {
                 ))
             }
             _ => Action::None,
+        }
+    }
+
+    pub fn get_status(&self) -> String {
+        if let Some(ref file_path) = self.selected_file_path {
+            let file_name = std::path::Path::new(file_path)
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or(file_path);
+
+            if self.file_content.is_some() {
+                let current_line = self.content_scroll_offset + 1;
+                if let Some(content) = &self.file_content {
+                    let total_lines = content.lines().count();
+                    format!("{}: Line {} / {}", file_name, current_line, total_lines)
+                } else {
+                    format!("{}", file_name)
+                }
+            } else {
+                format!("{}", file_name)
+            }
+        } else if let Some(entry) = self.get_selected() {
+            entry.name.clone()
+        } else {
+            "File Browser".to_string()
         }
     }
 
