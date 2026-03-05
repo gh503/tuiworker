@@ -406,24 +406,31 @@ impl FileBrowser {
     }
 
     fn render_file_list(&self, frame: &mut Frame, area: Rect, is_active: bool) {
+        let is_searching = self.search_mode && !self.search_query.is_empty();
+
         let items: Vec<ListItem> = self
             .entries
             .iter()
             .enumerate()
             .map(|(i, entry)| {
-                let name = if i == self.selected_index {
+                let is_selected = i == self.selected_index;
+                let is_matched = is_searching && self.search_results.contains(&i);
+
+                let name = if is_selected {
                     format!("> {}", entry.display_name())
                 } else {
                     entry.display_name()
                 };
 
-                let style = if i == self.selected_index {
-                    Style::default()
-                        .fg(Color::White)
-                        .add_modifier(Modifier::BOLD)
+                let (fg_color, modifier) = if is_selected {
+                    (Color::White, Modifier::BOLD)
+                } else if is_matched {
+                    (Color::Green, Modifier::BOLD)
                 } else {
-                    Style::default().fg(Color::Gray)
+                    (Color::Gray, Modifier::empty())
                 };
+
+                let style = Style::default().fg(fg_color).add_modifier(modifier);
 
                 ListItem::new(name).style(style)
             })
@@ -604,11 +611,23 @@ impl FileBrowser {
                 .content_scroll_offset
                 .min(lines.len().saturating_sub(1).max(0));
 
+            let search_highlight = !self.content_search_query.is_empty();
+            let query_lower = self.content_search_query.to_lowercase();
+
             let visible_lines: Vec<Line> = lines
                 .iter()
+                .enumerate()
                 .skip(scroll_offset)
                 .take(available_height)
-                .map(|line| Line::from(line.clone()))
+                .map(|(idx, line)| {
+                    if search_highlight && line.to_lowercase().contains(&query_lower) {
+                        let highlighted_line =
+                            Self::highlight_text(line, &self.content_search_query);
+                        Line::from(highlighted_line)
+                    } else {
+                        Line::from(line.clone())
+                    }
+                })
                 .collect();
 
             let paragraph = Paragraph::new(visible_lines)
@@ -640,6 +659,55 @@ impl FileBrowser {
                 .alignment(Alignment::Left);
             frame.render_widget(paragraph, area);
         }
+    }
+
+    fn highlight_text<'a>(line: &'a str, query: &str) -> Vec<Span<'a>> {
+        if query.is_empty() {
+            return vec![Span::raw(line)];
+        }
+
+        let line_lower = line.to_lowercase();
+        let query_lower = query.to_lowercase();
+
+        let mut spans = Vec::new();
+        let mut last_end = 0;
+
+        if let Some(first_match) = line_lower.find(&query_lower) {
+            if first_match > 0 {
+                spans.push(Span::raw(&line[..first_match]));
+            }
+
+            spans.push(Span::styled(
+                &line[first_match..first_match + query.len()],
+                Style::default()
+                    .fg(Color::Yellow)
+                    .bg(Color::DarkGray)
+                    .add_modifier(Modifier::BOLD),
+            ));
+
+            last_end = first_match + query.len();
+
+            while let Some(next_match) = line_lower[last_end..].find(&query_lower) {
+                let absolute_match = last_end + next_match;
+                spans.push(Span::raw(&line[last_end..absolute_match]));
+                spans.push(Span::styled(
+                    &line[absolute_match..absolute_match + query.len()],
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .bg(Color::DarkGray)
+                        .add_modifier(Modifier::BOLD),
+                ));
+                last_end = absolute_match + query.len();
+            }
+
+            if last_end < line.len() {
+                spans.push(Span::raw(&line[last_end..]));
+            }
+        } else {
+            spans.push(Span::raw(line));
+        }
+
+        spans
     }
 
     pub fn handle_mouse_event(&mut self, mouse: crossterm::event::MouseEvent) -> Action {
