@@ -690,8 +690,9 @@ impl FileBrowser {
                     };
 
                     // Calculate absolute byte position for this line
+                    let lines_ref: Vec<&str> = lines.iter().map(|s| s.as_str()).collect();
                     let line_start_byte =
-                        self.calculate_line_start_byte(lines, idx + scroll_offset);
+                        self.calculate_line_start_byte(&lines_ref, idx + scroll_offset);
 
                     if search_highlight && line.to_lowercase().contains(&query_lower) {
                         let highlighted_line =
@@ -1267,12 +1268,6 @@ impl FileBrowser {
 
                 if entry_info.is_some() {
                     let _ = self.open_selected();
-                }
-                Action::None
-            }
-            KeyCode::Char('c') => {
-                if self.file_content.is_some() {
-                    self.close_file();
                 }
                 Action::None
             }
