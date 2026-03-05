@@ -315,47 +315,40 @@ impl App {
     fn draw(&mut self, frame: &mut ratatui::prelude::Frame) {
         let size = frame.size();
 
-        let top_section_height = 3;
-        let status_bar_height = 1;
-        let min_content_height = 5;
-
-        if size.height < top_section_height + status_bar_height + min_content_height
-            || size.width < 20
-        {
+        let top_section_height = 3 + 1;
+        if size.height < top_section_height + 5 || size.width < 20 {
             return;
         }
 
         let top_section = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(top_section_height), Constraint::Min(1)])
+            .constraints([Constraint::Length(3), Constraint::Length(1)])
             .split(size);
 
         let app_bar_area = top_section[0];
-        let content_area = top_section[1];
+        let separator_area = top_section[1];
 
-        let content_split = Layout::default()
+        let main_section = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Min(min_content_height),
-                Constraint::Length(status_bar_height),
-            ])
-            .split(content_area);
+            .constraints([Constraint::Min(0), Constraint::Length(1)])
+            .split(separator_area);
 
-        let work_log_area = content_split[0];
-        let status_bar_area = content_split[1];
+        let work_status_area = main_section[0];
+        let status_bar_area = main_section[1];
 
         let (work_area, log_area) = if !self.log_panel_collapsed {
             let log_constraint = Constraint::Length(self.log_panel_height);
             let work_log_split = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints([Constraint::Min(min_content_height), log_constraint])
-                .split(work_log_area);
+                .constraints([Constraint::Min(3), log_constraint])
+                .split(work_status_area);
             (work_log_split[0], Some(work_log_split[1]))
         } else {
-            (work_log_area, None)
+            (work_status_area, None)
         };
 
         self.draw_app_bar(frame, app_bar_area);
+        self.draw_separator(frame, separator_area);
         self.draw_work_area(frame, work_area);
         self.draw_status_bar(frame, status_bar_area);
 
@@ -393,13 +386,9 @@ impl App {
         let modules_list: Vec<_> = self.modules.iter().map(|m| m.title()).collect();
         let total_modules = modules_list.len();
 
-        let display_count = if total_modules > 0 {
-            (left_width as usize / 4).min(total_modules.max(1))
-        } else {
-            1
-        };
-
         if total_modules > 0 {
+            let display_count = (left_width as usize / 4).min(total_modules).max(1);
+
             let start_index = if display_count >= total_modules {
                 0
             } else {
@@ -467,7 +456,7 @@ impl App {
 
         frame.render_widget(paragraph, help_area);
 
-        if total_modules > display_count {
+        if total_modules > display_count * 2 {
             let nav_text = format!(" ({}/{})", self.active_module_index + 1, total_modules);
             let nav_paragraph = Paragraph::new(nav_text)
                 .alignment(Alignment::Center)
@@ -480,6 +469,13 @@ impl App {
             .border_style(Style::default().fg(Color::Cyan));
 
         frame.render_widget(border, area);
+    }
+
+    fn draw_separator(&mut self, frame: &mut ratatui::prelude::Frame, area: Rect) {
+        let line = vec!['─'; area.width as usize];
+        let paragraph = Paragraph::new(line.into_iter().collect::<String>())
+            .style(Style::default().fg(Color::DarkGray));
+        frame.render_widget(paragraph, area);
     }
 
     fn draw_status_bar(&mut self, frame: &mut ratatui::prelude::Frame, area: Rect) {
@@ -538,7 +534,11 @@ impl App {
 
     fn draw_log_panel(&mut self, frame: &mut ratatui::prelude::Frame, area: Rect) {
         if self.log_panel_collapsed {
-            let indicator = " Logs »";
+            let indicator = if self.log_panel_collapsed {
+                " Logs »"
+            } else {
+                "« Logs"
+            };
             let paragraph = Paragraph::new(Line::from(Span::styled(
                 indicator,
                 Style::default().fg(Color::Yellow),
@@ -582,7 +582,11 @@ impl App {
                 })
                 .collect();
 
-            let indicator = "« Logs";
+            let indicator = if self.log_panel_collapsed {
+                " Logs »"
+            } else {
+                "« Logs"
+            };
             let title = format!("Logs (l) ↑↓{}", indicator);
 
             let paragraph = Paragraph::new(log_lines)
