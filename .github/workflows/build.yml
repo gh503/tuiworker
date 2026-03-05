@@ -136,8 +136,8 @@ jobs:
           ls -lh artifacts/
 
       - name: Build deb package
-        working-directory: ./src
         run: |
+          cd src
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev libasound2-dev
           cargo install cargo-deb
@@ -145,8 +145,8 @@ jobs:
           cargo deb --no-build
 
       - name: Build rpm package
-        working-directory: ./src
         run: |
+          cd src
           cargo install cargo-generate-rpm
           cargo generate-rpm --output=target/rpm/tuiworker.rpm
 
