@@ -588,26 +588,13 @@ impl FileBrowser {
             .get_selected()
             .map(|entry| (entry.is_dir, entry.name.clone()));
 
-        if let Some((is_dir, name)) = entry_info {
+        if let Some((is_dir, _name)) = entry_info {
             if is_dir {
                 let _ = self.enter();
-                Action::ShowMessage(core::event::Message::Info(format!(
-                    "Entered directory: {}",
-                    name
-                )))
+                Action::None
             } else {
-                let content_was_none = self.file_content.is_none();
                 let _ = self.open_selected();
-
-                let message = if self.file_content.is_some() {
-                    format!("Opened text file: {}", name)
-                } else if content_was_none {
-                    format!("Opened with system default: {}", name)
-                } else {
-                    format!("Opened file: {}", name)
-                };
-
-                Action::ShowMessage(core::event::Message::Info(message))
+                Action::None
             }
         } else {
             Action::None
@@ -641,10 +628,8 @@ impl FileBrowser {
             KeyCode::Esc | KeyCode::Char('c') => {
                 if self.file_content.is_some() {
                     self.close_file();
-                    Action::ShowMessage(core::event::Message::Info("Closed file".to_string()))
-                } else {
-                    Action::None
                 }
+                Action::None
             }
             KeyCode::Up | KeyCode::Char('k') => {
                 if self.file_content.is_some() {
@@ -724,64 +709,34 @@ impl FileBrowser {
             KeyCode::Enter => {
                 let entry_info = self
                     .get_selected()
-                    .map(|entry| (entry.is_dir, entry.name.clone()));
+                    .map(|entry| entry.is_dir);
 
-                if let Some((is_dir, name)) = entry_info {
+                if let Some(is_dir) = entry_info {
                     if is_dir {
                         let _ = self.enter();
-                        Action::ShowMessage(core::event::Message::Info(format!(
-                            "Entered directory: {}",
-                            name
-                        )))
                     } else {
-                        let content_was_none = self.file_content.is_none();
                         let _ = self.open_selected();
-
-                        let message = if self.file_content.is_some() {
-                            format!("Opened text file: {}", name)
-                        } else if content_was_none {
-                            format!("Opened with system default: {}", name)
-                        } else {
-                            format!("Opened file: {}", name)
-                        };
-
-                        Action::ShowMessage(core::event::Message::Info(message))
                     }
-                } else {
-                    Action::None
                 }
+                Action::None
             }
             KeyCode::Char('o') => {
-                let entry_info = self.get_selected().map(|entry| entry.name.clone());
+                let entry_info = self.get_selected();
 
-                if let Some(name) = entry_info {
-                    let content_was_none = self.file_content.is_none();
+                if entry_info.is_some() {
                     let _ = self.open_selected();
-
-                    let message = if self.file_content.is_some() {
-                        format!("Opened text file: {}", name)
-                    } else if content_was_none {
-                        format!("Opened with system default: {}", name)
-                    } else {
-                        format!("Opened file: {}", name)
-                    };
-
-                    Action::ShowMessage(core::event::Message::Info(message))
-                } else {
-                    Action::None
                 }
+                Action::None
             }
             KeyCode::Char('c') => {
                 if self.file_content.is_some() {
                     self.close_file();
-                    Action::ShowMessage(core::event::Message::Info("Closed file".to_string()))
-                } else {
-                    Action::None
                 }
+                Action::None
             }
             KeyCode::Char('u') | KeyCode::Backspace => {
                 let _ = self.go_up();
-                Action::ShowMessage(core::event::Message::Info("Navigated to parent directory".to_string()))
+                Action::None
             }
             KeyCode::Char('h') => {
                 self.toggle_hidden();
