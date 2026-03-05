@@ -1,0 +1,58 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # 匹配版本号格式，如 v0.1.0, v1.2.3 等
+
+permissions:
+  contents: write
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: extract_version
+        run: |
+          echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+          echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "Tag: $TAG"
+          echo "Version: $VERSION"
+
+      - name: Create GitHub Release (Draft)
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.TAG }}
+          name: Release ${{ env.TAG }}
+          body: |
+            ## Release Notes
+            查看下方自动生成的变更说明。
+          draft: true
+          prerelease: ${{ contains(env.TAG, 'alpha') || contains(env.TAG, 'beta') || contains(env.TAG, 'rc') }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Release Instructions
+        run: |
+          echo "✓ Draft release created: ${{ env.TAG }}"
+          echo ""
+          echo "📝 Next steps:"
+          echo "1. Go to: https://github.com/gh503/tuiworker/releases/tag/${{ env.TAG }}"
+          echo "2. Review the release notes"
+          echo "3. Click 'Publish release' to trigger automatic builds"
+          echo ""
+          echo "After publishing, CI will automatically:"
+          echo "- Build binaries for 5 platforms"
+          echo "- Build DEB and RPM packages"
+          echo "- Upload all artifacts to the release"
+
+      - name: Release Summary
+        run: |
+          echo "Release created: ${{ env.TAG }}"
+          echo "Prerelease: false"
