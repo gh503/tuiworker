@@ -577,16 +577,7 @@ impl App {
                 })
                 .collect();
 
-            let mut result = vec![
-                Line::from(vec![Span::styled(
-                    "Help",
-                    Style::default()
-                        .fg(Color::Cyan)
-                        .add_modifier(ratatui::style::Modifier::BOLD),
-                )]),
-                Line::from(""),
-            ];
-            result.extend(lines);
+            let mut result = lines;
             result.push(Line::from(""));
             result.push(Line::from(vec![
                 Span::styled("[Enter/Esc]", Style::default().fg(Color::Gray)),
