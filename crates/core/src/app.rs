@@ -313,7 +313,7 @@ impl App {
                             if self.log_panel_dragging && !self.log_panel_collapsed {
                                 let delta = mouse.row as i32 - log_area.y as i32;
                                 if delta != 0 {
-                                    self.adjust_log_panel_height(delta);
+                                    self.adjust_log_panel_height(-delta);
                                     return Ok(Some(Action::Consumed));
                                 }
                             }
