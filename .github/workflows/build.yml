@@ -14,25 +14,17 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-musl
-            artifact_suffix: linux-static
-            features: --no-default-features
-          
           - os: ubuntu-20.04
             target: x86_64-unknown-linux-gnu
             artifact_suffix: linux-glibc2.31
-            features: --default-features
-          
+
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             artifact_suffix: linux-glibc2.35
-            features: --default-features
-          
+
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            artifact_suffix: linux-glc2.39
-            features: --default-features
+            artifact_suffix: linux-glibc2.39
           
           - os: macos-latest
             target: x86_64-apple-darwin
@@ -70,36 +62,35 @@ jobs:
         run: |
           cargo install cross --git https://github.com/cross-rs/cross
 
-      - name: Install system dependencies (Linux dynamic)
-        if: runner.os == 'Linux' && matrix.target != 'x86_64-unknown-linux-musl'
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev libasound2-dev
 
-      - name: Run tests
+      - name: Run tests (macOS/Windows)
+        if: runner.os != 'Linux'
         shell: bash
         run: |
-          if [ "${{ matrix.target }}" = "x86_64-unknown-linux-musl" ]; then
-            cargo test -p core -p logging -p storage -p filebrowser -p todo --target ${{ matrix.target }} --verbose
-          else
-            cargo test --target ${{ matrix.target }} --verbose
-          fi
+          cargo test --target ${{ matrix.target }} --verbose
 
-      - name: Build
+      - name: Run tests (Linux)
+        if: runner.os == 'Linux'
         shell: bash
         run: |
-          if [ "${{ matrix.target }}" = "x86_64-unknown-linux-musl" ]; then
-            cross build --release --target ${{ matrix.target }} \
-              --no-default-features
-          elif [[ "${{ matrix.os }}" == *"mac"* ]]; then
-            # macOS: Native build, no cross needed
-            cargo build --release --target ${{ matrix.target }} --features "${{ matrix.features }}"
-          elif [[ "${{ matrix.os }}" == *"windows"* ]]; then
-            # Windows: Use cargo directly, cross doesn't work on Windows
-            cargo build --release --target ${{ matrix.target }} --features "${{ matrix.features }}"
-          else
-            cross build --release --target ${{ matrix.target }}
-          fi
+          cross test --target ${{ matrix.target }} --verbose
+
+      - name: Build (macOS/Windows)
+        if: runner.os != 'Linux'
+        shell: bash
+        run: |
+          cargo build --release --target ${{ matrix.target }}
+
+      - name: Build (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          cross build --release --target ${{ matrix.target }}
 
       - name: Get version
         id: version
