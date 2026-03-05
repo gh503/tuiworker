@@ -64,7 +64,7 @@ jobs:
           toolchain: stable
           targets: ${{ matrix.target }}
 
-      - name: Install cross (Linux)
+      - name: Install cross (Linux only)
         if: runner.os == 'Linux'
         shell: bash
         run: |
@@ -91,6 +91,12 @@ jobs:
           if [ "${{ matrix.target }}" = "x86_64-unknown-linux-musl" ]; then
             cross build --release --target ${{ matrix.target }} \
               --no-default-features
+          elif [[ "${{ matrix.os }}" == *"mac"* ]]; then
+            # macOS: Native build, no cross needed
+            cargo build --release --target ${{ matrix.target }} --features "${{ matrix.features }}"
+          elif [[ "${{ matrix.os }}" == *"windows"* ]]; then
+            # Windows: Use cargo directly, cross doesn't work on Windows
+            cargo build --release --target ${{ matrix.target }} --features "${{ matrix.features }}"
           else
             cross build --release --target ${{ matrix.target }}
           fi
