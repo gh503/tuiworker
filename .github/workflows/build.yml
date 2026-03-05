@@ -137,6 +137,7 @@ jobs:
 
       - name: Build deb package
         run: |
+          cd src
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev libasound2-dev
           cargo install cargo-deb
@@ -145,16 +146,17 @@ jobs:
 
       - name: Build rpm package
         run: |
+          cd src
           cargo install cargo-generate-rpm
-          cargo generate-rpm --output=target/rpm/tuiworker.rpm
+          cargo generate-rpm -p tui-workstation
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
             artifacts/binary-*/tuiworker*
-            target/debian/*.deb
-            target/rpm/*.rpm
+            src/target/debian/*.deb
+            src/target/rpm/*.rpm
           generate_release_notes: true
           draft: false
           prerelease: false
