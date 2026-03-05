@@ -303,8 +303,8 @@ cargo doc --no-deps
 
 ## 联系方式
 
-- **Issues**: [GitHub Issues](https://github.com/yourname/tui-workstation/issues)
-- **Email**: your.email@example.com
+- **Issues**: [GitHub Issues](https://github.com/gh503/tuiworker/issues)
+- **Email**: angus_robot@163.com
 - **Discord**: (待建立)
 
 ---

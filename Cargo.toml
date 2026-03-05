@@ -55,10 +55,11 @@ assets = [
 ]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.0-alpha"
 edition = "2021"
-authors = ["Your Name <your.email@example.com>"]
+authors = ["gh503 <angus_robot@163.com>"]
 license = "MIT"
+repository = "https://github.com/gh503/tuiworker"
 
 [workspace.dependencies]
 # 核心依赖

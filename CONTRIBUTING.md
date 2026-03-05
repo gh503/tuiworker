@@ -29,8 +29,8 @@
 
 ```bash
 # 克隆仓库
-git clone https://github.com/yourname/tui-workstation
-cd tui-workstation
+git clone https://github.com/gh503/tuiworker
+cd tuiworker
 
 # 安装开发工具
 cargo install cargo-watch

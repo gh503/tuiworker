@@ -47,13 +47,28 @@
 
 ### 安装
 
+**从源码编译**:
 ```bash
-# 从源码编译
-git clone https://github.com/yourname/tuiworker
+git clone https://github.com/gh503/tuiworker
 cd tuiworker
 cargo build --release
+```
 
-# 或下载预编译二进制文件（暂未发布）
+**下载预编译二进制文件**:
+- 从 [Releases](https://github.com/gh503/tuiworker/releases) 页面下载
+
+**通过包管理器安装**:
+
+Ubuntu/Debian:
+```bash
+wget https://github.com/gh503/tuiworker/releases/download/v0.1.0-alpha/tuiworker_0.1.0-alpha_amd64.deb
+sudo dpkg -i tuiworker_0.1.0-alpha_amd64.deb
+```
+
+Fedora/RHEL:
+```bash
+wget https://github.com/gh503/tuiworker/releases/download/v0.1.0-alpha/tuiworker.rpm
+sudo rpm -i tuiworker.rpm
 ```
 
 ### 配置
@@ -110,6 +125,8 @@ tuiworker/
 
 ### 实现进度
 
+**当前版本**: v0.1.0-alpha (仅 FileBrowser 模块可用，其他模块开发中)
+
 | 模块 | 状态 | 说明 |
 |------|------|------|
 | 核心基础设施 | ✅ 完成 | Module trait、事件系统、应用框架 |
@@ -117,7 +134,7 @@ tuiworker/
 | 数据存储 | ✅ 完成 | sled 数据库封装 |
 | 配置管理 | ✅ 完成 | XDG 目录支持、TOML 配置 |
 | TUI 渲染基础 | ✅ 完成 | ratatui 集成、状态栏、标签栏 |
-| FileBrowser | 🟡 开发中 | 文件浏览、搜索、状态栏集成 |
+| FileBrowser | ✅ 可用 | 文件浏览、搜索、状态栏集成 |
 | Todo | ⬜ 框架 | 基础结构已实现 |
 | Note | ⬜ 框架 | 基础结构已实现 |
 | Diary | ⬜ 框架 | 基础结构已实现 |
@@ -129,8 +146,11 @@ tuiworker/
 | 快捷键系统 | ✅ 完成 | 模块间快捷键绑定 |
 | 主题支持 | 🟡 开发中 | 基础主题系统 |
 
+**注**: v0.1.0-alpha 仅提供 FileBrowser 功能演示，其他模块将在后续版本逐步实现。
+
 ### 发布计划
 
+- **v0.1.0-alpha** - 当前版本（仅 FileBrowser 完成，其他模块框架已建立）
 - **v0.1.0** - MVP (FileBrowser + Todo + Note + Diary + Terminal)
 - **v0.2.0** - + Git 操作模块
 - **v0.3.0** - + Music 播放模块
@@ -205,7 +225,7 @@ default_shell = "bash"
 
 ```bash
 # 克隆项目
-git clone https://github.com/yourname/tuiworker
+git clone https://github.com/gh503/tuiworker
 cd tuiworker
 
 # 运行测试
@@ -219,6 +239,9 @@ cargo fmt
 
 # 构建
 cargo build --release
+
+# 构建 DEB 和 RPM 包
+make package-all
 ```
 
 ## 文档
@@ -239,16 +262,21 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 - [sled](https://github.com/spacejam/sled) - 嵌入式数据库
 - [tokio](https://tokio.rs/) - 异步运行时
 - [symphonia](https://github.com/pdeljanov/Symphonia) - 音频解码
+- [cargo-deb](https://github.com/kornelski/cargo-deb) - DEB 包构建工具
+- [cargo-generate-rpm](https://github.com/cat-in-135/cargo-generate-rpm) - RPM 包构建工具
 
 ## 联系方式
 
-- Issue: [GitHub Issues](https://github.com/yourname/tuiworker/issues)
-- Email: your.email@example.com
+- Issue: [GitHub Issues](https://github.com/gh503/tuiworker/issues)
+- Email: angus_robot@163.com
 
 ---
 
 **当前版本**: v0.1.0-alpha
 **更新时间**: 2026-03-05
+**仓库地址**: https://github.com/gh503/tuiworker
+
+**注意**: 当前为开发中版本，仅 FileBrowser 模块可用。其他模块正在逐步开发中。
 
 ## 提高项目曝光度
 
