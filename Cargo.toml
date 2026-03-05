@@ -72,12 +72,8 @@ imap = { version = "3.0.0-alpha.15", features = ["rustls-tls"] }
 lettre = { version = "0.11", default-features = false, features = ["file-transport", "smtp-transport", "builder", "tokio1", "tokio1-rustls", "serde", "rustls-tls"] }
 mailparse = "0.14"
 
-# Git
-git2 = { version = "0.20", default-features = false }
-
-# 日历/农历
-lunar-rs = "0.4"
-chinese-calendar = "0.1"
+# 剪贴板
+copypasta = "0.10"
 
 # 伪终端
 portable-pty = "0.8"
@@ -85,9 +81,6 @@ portable-pty = "0.8"
 # 其他
 opener = "0.6"
 atty = "0.2"
-
-[workspace.dependencies]
-copier = "0.10"
 
 [workspace.dependencies.logging]
 path = "crates/logging"

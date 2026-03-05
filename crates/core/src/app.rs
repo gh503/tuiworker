@@ -254,6 +254,39 @@ impl App {
                             shortcuts.join(" | "),
                         ))));
                     }
+                    crossterm::event::KeyCode::Tab => {
+                        if key.modifiers == crossterm::event::KeyModifiers::CONTROL {
+                            if self.modules.is_empty() {
+                                return Ok(None);
+                            }
+                            self.active_module_index =
+                                (self.active_module_index + 1) % self.modules.len();
+                            let module_name =
+                                self.modules[self.active_module_index].name().to_string();
+                            return Ok(Some(Action::SwitchModule(module_name)));
+                        }
+                    }
+                    crossterm::event::KeyCode::BackTab => {
+                        if key
+                            .modifiers
+                            .contains(crossterm::event::KeyModifiers::SHIFT)
+                            || key
+                                .modifiers
+                                .contains(crossterm::event::KeyModifiers::CONTROL)
+                        {
+                            if self.modules.is_empty() {
+                                return Ok(None);
+                            }
+                            if self.active_module_index == 0 {
+                                self.active_module_index = self.modules.len() - 1;
+                            } else {
+                                self.active_module_index -= 1;
+                            }
+                            let module_name =
+                                self.modules[self.active_module_index].name().to_string();
+                            return Ok(Some(Action::SwitchModule(module_name)));
+                        }
+                    }
                     crossterm::event::KeyCode::Right => {
                         if key.modifiers == crossterm::event::KeyModifiers::CONTROL {
                             if self.modules.is_empty() {
@@ -511,7 +544,7 @@ impl App {
             }
         }
 
-        let help_text = "[?] Help | Ctrl+L: Logs Ctrl↓↑ | Ctrl+←/→: Switch | [q] Quit";
+        let help_text = "[?] Help | Tab/Shift+Tab: Switch | Ctrl+←/→: Switch | Ctrl+L: Logs | Ctrl+↑/↓: Log Height | [q] Quit";
 
         let paragraph = Paragraph::new(help_text)
             .alignment(Alignment::Right)
@@ -555,7 +588,7 @@ impl App {
 
     fn draw_dialog(&mut self, frame: &mut ratatui::prelude::Frame, area: Rect) {
         let overlay_width = 70.min(area.width - 4);
-        let overlay_height = 15.min(area.height - 4);
+        let overlay_height = 25.min(area.height - 4);
 
         let overlay_area = Rect {
             x: area.x + (area.width.saturating_sub(overlay_width)) / 2,
@@ -679,6 +712,7 @@ impl App {
                         .border_style(border_style),
                 )
                 .alignment(Alignment::Left)
+                .wrap(ratatui::widgets::Wrap { trim: true })
                 .scroll((
                     (self
                         .log_messages

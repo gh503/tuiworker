@@ -1,3 +1,4 @@
+use copypasta::ClipboardProvider;
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEventKind};
 use ignore::WalkBuilder;
 use log;
@@ -5,7 +6,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Position, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span, Text},
-    widgets::{Block, Borders, List, ListItem, Paragraph},
+    widgets::{Block, Borders, Clear, List, ListItem, Paragraph},
     Frame,
 };
 use std::time::{Duration, Instant};
@@ -45,6 +46,9 @@ pub struct FileBrowser {
     selection_start_col: Option<usize>,
     selecting: bool,
     context_menu_visible: bool,
+    delete_pending: bool,
+    rename_input: String,
+    rename_mode: bool,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -92,6 +96,9 @@ impl FileBrowser {
             selection_start_col: None,
             selecting: false,
             context_menu_visible: false,
+            delete_pending: false,
+            rename_input: String::new(),
+            rename_mode: false,
         };
         let _ = browser.refresh();
         browser
@@ -423,6 +430,93 @@ impl FileBrowser {
         self.render_file_list(frame, files_area, self.active_area == ActiveArea::FileList);
         self.render_split_bar(frame, split_bar_area);
         self.render_info_panel(frame, info_area, self.active_area == ActiveArea::Content);
+
+        if self.delete_pending {
+            self.render_delete_confirm(frame, area);
+        }
+
+        if self.rename_mode {
+            self.render_rename_input(frame, area);
+        }
+    }
+
+    fn render_delete_confirm(&self, frame: &mut Frame, area: Rect) {
+        let overlay_width = 50.min(area.width - 4);
+        let overlay_height = 8.min(area.height - 4);
+
+        let overlay_area = Rect {
+            x: area.x + (area.width.saturating_sub(overlay_width)) / 2,
+            y: area.y + (area.height.saturating_sub(overlay_height)) / 2,
+            width: overlay_width,
+            height: overlay_height,
+        };
+
+        let entry_name = self
+            .get_selected()
+            .map(|e| e.name.clone())
+            .unwrap_or_else(|| String::from("selected"));
+
+        let content = vec![
+            Line::from("Confirm Delete"),
+            Line::from(""),
+            Line::from(format!("Delete '{}'?", entry_name)),
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("[y]", Style::default().fg(Color::Green)),
+                Span::raw(" Confirm  "),
+                Span::styled("[Esc]", Style::default().fg(Color::Red)),
+                Span::raw(" Cancel"),
+            ]),
+        ];
+
+        let paragraph = Paragraph::new(content)
+            .block(
+                Block::default()
+                    .title(" Delete ")
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(Color::Red)),
+            )
+            .alignment(Alignment::Center);
+
+        frame.render_widget(Clear, overlay_area);
+        frame.render_widget(paragraph, overlay_area);
+    }
+
+    fn render_rename_input(&self, frame: &mut Frame, area: Rect) {
+        let overlay_width = 50.min(area.width - 4);
+        let overlay_height = 8.min(area.height - 4);
+
+        let overlay_area = Rect {
+            x: area.x + (area.width.saturating_sub(overlay_width)) / 2,
+            y: area.y + (area.height.saturating_sub(overlay_height)) / 2,
+            width: overlay_width,
+            height: overlay_height,
+        };
+
+        let content = vec![
+            Line::from("Rename"),
+            Line::from(""),
+            Line::from(self.rename_input.clone()),
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("[Enter]", Style::default().fg(Color::Green)),
+                Span::raw(" Confirm  "),
+                Span::styled("[Esc]", Style::default().fg(Color::Red)),
+                Span::raw(" Cancel"),
+            ]),
+        ];
+
+        let paragraph = Paragraph::new(content)
+            .block(
+                Block::default()
+                    .title(" Rename ")
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(Color::Yellow)),
+            )
+            .alignment(Alignment::Center);
+
+        frame.render_widget(Clear, overlay_area);
+        frame.render_widget(paragraph, overlay_area);
     }
 
     fn render_search_bar(&self, frame: &mut Frame, area: Rect) {
@@ -923,9 +1017,18 @@ impl FileBrowser {
                 Action::Consumed
             }
             MouseEventKind::Down(MouseButton::Right) => {
+                log::info!(
+                    "Right click: text_selection={:?}",
+                    self.text_selection.is_some()
+                );
                 if self.text_selection.is_some() {
-                    if let Ok(text) = self.copy_selected_text() {
-                        log::info!("Copied text to clipboard: {} chars", text.len());
+                    match self.copy_selected_text() {
+                        Ok(text) => {
+                            log::info!("Copied text to clipboard: {} chars", text.len());
+                        }
+                        Err(e) => {
+                            log::error!("Right click copy failed: {}", e);
+                        }
                     }
                     return Action::Consumed;
                 }
@@ -1019,6 +1122,75 @@ impl FileBrowser {
         self.content_search_index = 0;
     }
 
+    fn start_delete(&mut self) {
+        self.delete_pending = true;
+    }
+
+    fn confirm_delete(&mut self) -> anyhow::Result<()> {
+        if let Some(entry) = self.get_selected() {
+            let path = entry.path.clone();
+            if path.exists() {
+                if path.is_dir() {
+                    // Check if directory is empty
+                    let is_empty = path.read_dir()?.next().is_none();
+                    if !is_empty {
+                        return anyhow::bail!("Cannot delete non-empty directory");
+                    }
+                    std::fs::remove_dir(&path)?;
+                } else {
+                    std::fs::remove_file(&path)?;
+                }
+                log::info!("Deleted: {:?}", path);
+                self.refresh()?;
+                self.delete_pending = false;
+            }
+        }
+        Ok(())
+    }
+
+    fn cancel_delete(&mut self) {
+        self.delete_pending = false;
+    }
+
+    fn start_rename(&mut self) {
+        if let Some(entry) = self.get_selected() {
+            self.rename_input = entry.name.clone();
+            self.rename_mode = true;
+        }
+    }
+
+    fn confirm_rename(&mut self) -> anyhow::Result<()> {
+        if self.rename_input.is_empty() {
+            return anyhow::bail!("Name cannot be empty");
+        }
+
+        if let Some(entry) = self.get_selected() {
+            let old_path = entry.path.clone();
+            let new_path = self.current_path.join(&self.rename_input);
+
+            if !old_path.exists() {
+                return anyhow::bail!("Original file not found");
+            }
+
+            if new_path.exists() && new_path != old_path {
+                return anyhow::bail!("Target already exists");
+            }
+
+            std::fs::rename(&old_path, &new_path)?;
+            log::info!("Renamed: {:?} -> {:?}", old_path, new_path);
+            self.refresh()?;
+        }
+
+        self.rename_mode = false;
+        self.rename_input.clear();
+        Ok(())
+    }
+
+    fn cancel_rename(&mut self) {
+        self.rename_mode = false;
+        self.rename_input.clear();
+    }
+
     fn perform_file_search(&mut self) {
         self.search_results.clear();
         if self.search_query.is_empty() {
@@ -1106,13 +1278,117 @@ impl FileBrowser {
             return self.handle_search_key(key);
         }
 
+        // Handle rename mode
+        if self.rename_mode {
+            match key.code {
+                KeyCode::Esc => {
+                    self.cancel_rename();
+                    return Action::Consumed;
+                }
+                KeyCode::Enter => {
+                    match self.confirm_rename() {
+                        Ok(_) => {}
+                        Err(e) => {
+                            log::error!("Failed to rename: {}", e);
+                        }
+                    }
+                    return Action::Consumed;
+                }
+                KeyCode::Backspace => {
+                    self.rename_input.pop();
+                    return Action::Consumed;
+                }
+                KeyCode::Char(c) => {
+                    if !c.is_control() {
+                        self.rename_input.push(c);
+                    }
+                    return Action::Consumed;
+                }
+                _ => return Action::None,
+            }
+        }
+
+        // Cancel delete with Esc
+        if self.delete_pending && key.code == KeyCode::Esc {
+            self.cancel_delete();
+            return Action::Consumed;
+        }
+
+        // Delete with 'd' key
+        if key.code == KeyCode::Char('d') && key.modifiers.is_empty() {
+            if !self.delete_pending {
+                self.start_delete();
+            }
+            return Action::Consumed;
+        }
+
+        // Rename with 'r' key
+        if key.code == KeyCode::Char('r') && key.modifiers.is_empty() {
+            if !self.rename_mode {
+                self.start_rename();
+            }
+            return Action::Consumed;
+        }
+
+        // Confirm delete with 'y' key when pending
+        if self.delete_pending && key.code == KeyCode::Char('y') && key.modifiers.is_empty() {
+            match self.confirm_delete() {
+                Ok(_) => {}
+                Err(e) => {
+                    log::error!("Failed to delete: {}", e);
+                }
+            }
+            return Action::Consumed;
+        }
+
+        // Quick copy with 'y' key (like vim) - only if not in delete pending mode
+        if key.code == KeyCode::Char('y') && key.modifiers.is_empty() {
+            if let Some((start, end)) = self.text_selection {
+                log::info!("Y key: copying selection {} to {}", start, end);
+                match self.copy_selected_text() {
+                    Ok(text) => {
+                        log::info!("Copied to clipboard: {} chars", text.len());
+                    }
+                    Err(e) => {
+                        log::error!("Failed to copy: {}", e);
+                    }
+                }
+                self.text_selection = None;
+            }
+            return Action::Consumed;
+        }
+
+        // Copy file/folder path with 'p' key
+        if key.code == KeyCode::Char('p') && key.modifiers.is_empty() {
+            match self.copy_path_to_clipboard() {
+                Ok(path) => {
+                    log::info!("Copied path to clipboard: {}", path);
+                }
+                Err(e) => {
+                    log::error!("Failed to copy path: {}", e);
+                }
+            }
+            return Action::Consumed;
+        }
+
+        // Search with '/' key
+        if key.code == KeyCode::Char('/') && key.modifiers.is_empty() {
+            if self.active_area == ActiveArea::Content && self.file_content.is_some() {
+                self.start_content_search();
+            } else {
+                self.start_search();
+            }
+            return Action::Consumed;
+        }
+
         match key.code {
             KeyCode::Esc | KeyCode::Char('c') => {
                 if key
                     .modifiers
                     .contains(crossterm::event::KeyModifiers::CONTROL)
                 {
-                    if self.text_selection.is_some() {
+                    log::info!("Ctrl+C pressed, text_selection={:?}", self.text_selection);
+                    if let Some((start, end)) = self.text_selection {
                         match self.copy_selected_text() {
                             Ok(text) => {
                                 log::info!("Copied to clipboard: {} chars", text.len());
@@ -1143,18 +1419,6 @@ impl FileBrowser {
                     }
                     ActiveArea::Content => ActiveArea::FileList,
                 };
-                Action::Consumed
-            }
-            KeyCode::Char('f')
-                if key
-                    .modifiers
-                    .contains(crossterm::event::KeyModifiers::CONTROL) =>
-            {
-                if self.active_area == ActiveArea::Content && self.file_content.is_some() {
-                    self.start_content_search();
-                } else {
-                    self.start_search();
-                }
                 Action::Consumed
             }
             KeyCode::Up | KeyCode::Char('k') => {
@@ -1290,75 +1554,165 @@ impl FileBrowser {
                     SortBy::Modified => "modified",
                 };
                 Action::ShowMessage(core::event::Message::Info(
-                    format!("j/k: Navigate | Enter: Enter dir | o: Open | c: Close file | Esc: Close file | h: Toggle hidden | s: Sort ({}) | u: Up | Tab: Switch focus | Ctrl+F: Search", sort_mode)
-                ))
+                format!("j/k: Navigate | Enter: Enter | o: Open | d: Delete | r: Rename | c/Esc: Close | h: Hidden | s: Sort ({}) | u: Up | Tab: Focus | p: Path | y: Text | /: Search", sort_mode)
+            ))
             }
             _ => Action::None,
         }
     }
 
     pub fn get_status(&self) -> String {
-        log::info!(
-            "get_status: file_content.is_some()={}, selected_file_path={:?}",
-            self.file_content.is_some(),
-            self.selected_file_path
-        );
         if self.file_content.is_some() {
-            if let Some(ref file_path) = self.selected_file_path {
-                let file_name = std::path::Path::new(file_path)
+            if let Some(path_str) = &self.selected_file_path {
+                let path = std::path::Path::new(path_str);
+                let file_name = path
                     .file_name()
                     .and_then(|n| n.to_str())
-                    .unwrap_or(file_path);
-
-                let current_line = self.content_scroll_offset + 1;
-                let total_lines = self
+                    .unwrap_or("unknown");
+                let line = self.content_scroll_offset + 1;
+                let total = self
                     .file_content
                     .as_ref()
                     .map(|c| c.lines().count())
                     .unwrap_or(0);
-
-                let status = format!("{}: Line {} / {}", file_name, current_line, total_lines);
-                log::info!("get_status returning: {}", status);
-                status
-            } else {
-                "Opened File".to_string()
+                return format!("{}: Line {} / {}", file_name, line, total);
             }
-        } else if self.selected_file_path.is_some() {
-            let file_name = self
-                .selected_file_path
-                .as_ref()
-                .and_then(|p| {
-                    std::path::Path::new(p)
-                        .file_name()
-                        .and_then(|n| n.to_str().map(String::from))
-                })
-                .unwrap_or_else(|| self.selected_file_path.as_ref().unwrap().clone());
-            log::info!("get_status: file_path but no content: {}", file_name);
-            file_name
         } else if let Some(entry) = self.get_selected() {
-            log::info!("get_status: selected entry: {}", entry.name);
-            entry.name.clone()
-        } else {
-            log::info!("get_status: File Browser (fallback)");
-            "File Browser".to_string()
+            return entry.name.clone();
         }
+        "File Browser".to_string()
     }
 
     pub fn copy_selected_text(&self) -> Result<String, String> {
-        if let Some((start, end)) = self.text_selection {
-            if let Some(content) = &self.file_content {
-                let start = start.min(end);
-                let end = end.max(start);
-                if content.len() >= end {
-                    let selected_text = content[start..end].to_string();
-                    if let Err(e) = copier::copy_string(&selected_text) {
-                        return Err(format!("Failed to copy to clipboard: {}", e));
+        let (sel_start, sel_end) = self.text_selection.ok_or("No text selected")?;
+        let content = self.file_content.as_ref().ok_or("No file content")?;
+
+        let start = sel_start.min(sel_end);
+        let end = sel_start.max(sel_end);
+
+        log::info!(
+            "Copy: original=({},{}), start={}, end={}, content_len={}",
+            sel_start,
+            sel_end,
+            start,
+            end,
+            content.len()
+        );
+
+        if end > content.len() {
+            return Err(format!(
+                "Selection {} exceeds content {}",
+                end,
+                content.len()
+            ));
+        }
+        if start >= end {
+            return Err(format!("Invalid selection: {} >= {}", start, end));
+        }
+
+        // Convert byte positions to character boundaries to avoid UTF-8 panics
+        let safe_start = content
+            .char_indices()
+            .find(|(b, _)| *b >= start)
+            .map(|(b, _)| b)
+            .unwrap_or(start);
+
+        let safe_end = content
+            .char_indices()
+            .find(|(b, _)| *b >= end)
+            .map(|(b, _)| b)
+            .unwrap_or(end);
+
+        log::info!(
+            "Adjusted byte positions: {}..{} -> {}..{}",
+            start,
+            end,
+            safe_start,
+            safe_end
+        );
+
+        let selected_text = content[safe_start..safe_end].to_string();
+        log::info!(
+            "Selected text length: {}, preview: {} chars",
+            selected_text.chars().count(),
+            if selected_text.chars().count() > 30 {
+                format!("{}...", selected_text.chars().take(30).collect::<String>())
+            } else {
+                selected_text.clone()
+            }
+        );
+
+        // Try clipboard
+        use copypasta::ClipboardProvider;
+        match copypasta::ClipboardContext::new() {
+            Ok(mut ctx) => {
+                log::info!("Clipboard context created successfully");
+                match ctx.set_contents(selected_text.clone()) {
+                    Ok(_) => {
+                        log::info!("Copied to clipboard");
+
+                        // Verify by reading back
+                        match ctx.get_contents() {
+                            Ok(read_back) => {
+                                if read_back == selected_text {
+                                    log::info!("Clipboard verification: OK");
+                                } else {
+                                    log::error!("Clipboard verification FAILED");
+                                }
+                            }
+                            Err(e) => {
+                                log::error!("Clipboard verification read failed: {:?}", e);
+                            }
+                        }
+
+                        Ok(selected_text)
                     }
-                    return Ok(selected_text);
+                    Err(e) => {
+                        log::error!("Clipboard copy failed: {:?}", e);
+                        let _ = self.save_to_temp_file(&selected_text);
+                        return Ok(selected_text);
+                    }
                 }
             }
+            Err(e) => {
+                log::error!("Clipboard unavailable: {:?}", e);
+                let _ = self.save_to_temp_file(&selected_text);
+                Ok(selected_text)
+            }
         }
-        Err("No text selected".to_string())
+    }
+
+    fn save_to_temp_file(&self, text: &str) -> String {
+        let temp_path = std::path::PathBuf::from("/tmp/tuiworker_copied_text.txt");
+        match std::fs::write(&temp_path, text) {
+            Ok(_) => format!("Saved to {}", temp_path.display()),
+            Err(e) => format!("Failed to save: {}", e),
+        }
+    }
+
+    pub fn copy_path_to_clipboard(&self) -> Result<String, String> {
+        let path = if let Some(ref file_path) = self.selected_file_path {
+            file_path.clone()
+        } else if let Some(entry) = self.get_selected() {
+            let full_path = self.current_path.join(&entry.name);
+            full_path.to_string_lossy().to_string()
+        } else {
+            return Err("No file or folder selected".to_string());
+        };
+
+        log::info!("Copying path to clipboard: {}", path);
+
+        use copypasta::ClipboardProvider;
+        match copypasta::ClipboardContext::new() {
+            Ok(mut ctx) => match ctx.set_contents(path.clone()) {
+                Ok(_) => {
+                    let _ = ctx.get_contents();
+                    Ok(path)
+                }
+                Err(e) => Err(format!("Failed to copy path: {:?}", e)),
+            },
+            Err(e) => Err(format!("Clipboard unavailable: {:?}", e)),
+        }
     }
 
     pub fn handle_text_selection_start(&mut self, line: usize, col: usize) {
@@ -1482,11 +1836,15 @@ impl FileBrowser {
             },
             Shortcut {
                 key: "Enter",
-                description: "Enter directory",
+                description: "Enter directory/file",
             },
             Shortcut {
                 key: "o",
-                description: "Open file",
+                description: "Open file in external app",
+            },
+            Shortcut {
+                key: "c/Esc",
+                description: "Close file",
             },
             Shortcut {
                 key: "u",
@@ -1509,28 +1867,32 @@ impl FileBrowser {
                 description: "Search files",
             },
             Shortcut {
-                key: "Esc",
-                description: "Exit search/selection",
+                key: "d",
+                description: "Delete file (press d, then y)",
             },
             Shortcut {
-                key: "Ctrl+L/R",
-                description: "Scroll content",
+                key: "r",
+                description: "Rename (type new name, Enter)",
             },
             Shortcut {
-                key: "Ctrl+U/D",
-                description: "Scroll content pages",
+                key: "Tab",
+                description: "Switch file list/content",
             },
             Shortcut {
-                key: "Ctrl+F/B",
-                description: "Content search",
+                key: "PageUp/Down",
+                description: "Scroll page",
             },
             Shortcut {
-                key: "n/N",
-                description: "Next/prev search result",
+                key: "Home/End",
+                description: "Go to start/end",
             },
             Shortcut {
-                key: "Ctrl+C / Right-click",
+                key: "y",
                 description: "Copy selected text",
+            },
+            Shortcut {
+                key: "p",
+                description: "Copy file/folder path",
             },
             Shortcut {
                 key: "Drag in content",

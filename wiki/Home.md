@@ -28,10 +28,21 @@ Toggle language in the top right corner, or view the documentation in your prefe
 
 ## 最新版本 / Latest Version
 
-**v0.1.0-alpha** - 首个 alpha 版本
+**v0.1.0-alpha**
 
-- 仅 FileBrowser 模块可用
-- Only FileBrowser module is available
+### 已实现功能 / Implemented Features
+
+- ✅ FileBrowser 模块完整功能
+  - 文件/目录浏览和导航
+  - 文本预览
+  - 外部程序打开
+  - 搜索文件
+  - 文件/文件夹删除和重命名
+  - 文本选择和复制
+  - 文件/文件夹路径复制
+  - 排序（名称/大小/修改时间）
+  - 显示/隐藏隐藏文件
+  - 分屏视图（文件列表+内容预览）
 
 ## 参与贡献 / Contributing
 

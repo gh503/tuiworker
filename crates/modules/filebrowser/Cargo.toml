@@ -19,4 +19,4 @@ ignore = { workspace = true }
 shell-words = { workspace = true }
 opener = { workspace = true }
 log = { workspace = true }
-copier = { workspace = true }
+copypasta = { workspace = true }

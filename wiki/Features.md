@@ -6,7 +6,7 @@
 
 | 功能 | 描述 | 状态 |
 |------|------|------|
-| 📁 **文件管理器** | 浏览文件系统，文本预览，打开外部文件 | ✅ 可用 |
+| 📁 **文件管理器** | 浏览文件系统，文本预览，打开外部文件，删除/重命名文件 | ✅ 可用 |
 | ✅ **待办事项** | 完整的 TODO 管理，支持标签、优先级 | 🏗️ 开发中 |
 | 📝 **笔记** | Markdown 编辑，标签系统，快速记录 | 🏗️ 开发中 |
 | 📅 **日记** | 日历视图，农历显示，节假日标记 | 🏗️ 开发中 |
@@ -33,7 +33,7 @@
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| 📁 **File Browser** | Browse filesystem, preview text, open external files | ✅ Available |
+| 📁 **File Browser** | Browse filesystem, preview text, open external files, delete/rename files | ✅ Available |
 | ✅ **Todo List** | Complete TODO management with tags and priorities | 🏗️ In Development |
 | 📝 **Notes** | Markdown editing, tag system, quick note-taking | 🏗️ In Development |
 | 📅 **Diary** | Calendar view, lunar calendar, holiday markers | 🏗️ In Development |

@@ -25,13 +25,18 @@
 | `h` | 显示/隐藏隐藏文件 |
 | `s` | 切换排序方式 (名称/大小) |
 | `m` | 按修改时间排序 |
+| `d` | 删除文件 (按 d 弹出确认，再按 y 确认) |
+| `r` | 重命名文件 (输入新名称后按 Enter 确认) |
 | `/` | 搜索文件 |
 | `Tab` | 在文件列表和内容区间切换 |
-| `Ctrl + F` | 在文件内容中搜索 |
-| `Ctrl + L` / `Ctrl + R` | 左右滚动内容 |
-| `Ctrl + U` / `Ctrl + D` | 向上/向下翻页 |
-| `n` / `N` | 下一个/上一个搜索结果 |
-| `Esc` | 关闭文件/退出搜索 |
+| `p` | 复制文件/文件夹路径 |
+| `y` | 复制选中文本 |
+| `Esc` | 关闭文件/退出搜索/取消删除 |
+| `Enter` | 进入目录/打开文件 |
+| `Backspace` | 返回上级目录 |
+| `PageUp` / `PageDown` | 翻页 |
+| `Home` / `End` | 跳到首/尾 |
+| `←` / `→` | 左右滚动内容 |
 | **鼠标拖拽** | 选择文本 |
 | **右键点击** | 复制选中文本到剪贴板 |
 | **Ctrl + C** | 复制选中文本 |
@@ -63,13 +68,18 @@
 | `h` | Toggle show hidden files |
 | `s` | Toggle sort by (name/size) |
 | `m` | Sort by modified time |
+| `d` | Delete file (Press d to confirm dialog, then y to delete) |
+| `r` | Rename file (Input new name, then Enter to confirm) |
 | `/` | Search files |
 | `Tab` | Switch between file list and content |
-| `Ctrl + F` | Search in file content |
-| `Ctrl + L` / `Ctrl + R` | Scroll content left/right |
-| `Ctrl + U` / `Ctrl + D` | Page up/down |
-| `n` / `N` | Next/previous search result |
-| `Esc` | Close file/exit search |
+| `p` | Copy file/folder path |
+| `y` | Copy selected text |
+| `Esc` | Close file/exit search/cancel delete |
+| `Enter` | Enter directory/open file |
+| `Backspace` | Go to parent directory |
+| `PageUp` / `PageDown` | Page up/down |
+| `Home` / `End` | Go to start/end |
+| `←` / `→` | Scroll content left/right |
 | **Mouse Drag** | Select text |
 | **Right Click** | Copy selected text to clipboard |
 | **Ctrl + C** | Copy selected text |
