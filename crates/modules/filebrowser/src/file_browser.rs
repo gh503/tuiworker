@@ -1199,6 +1199,7 @@ impl FileBrowser {
     }
 
     pub fn get_status(&self) -> String {
+        log::info!("get_status: file_content.is_some()={}, selected_file_path={:?}", self.file_content.is_some(), self.selected_file_path);
         if self.file_content.is_some() {
             if let Some(ref file_path) = self.selected_file_path {
                 let file_name = std::path::Path::new(file_path)
@@ -1212,33 +1213,22 @@ impl FileBrowser {
                     .unwrap_or(0);
                 
                 let status = format!("{}: Line {} / {}", file_name, current_line, total_lines);
-                log::debug!("get_status returning: {}", status);
+                log::info!("get_status returning: {}", status);
                 status
             } else {
                 "Opened File".to_string()
             }
         } else if self.selected_file_path.is_some() {
-            self.selected_file_path.as_ref()
+            let file_name = self.selected_file_path.as_ref()
                 .and_then(|p| std::path::Path::new(p).file_name().and_then(|n| n.to_str().map(String::from)))
-                .unwrap_or_else(|| self.selected_file_path.as_ref().unwrap().clone())
+                .unwrap_or_else(|| self.selected_file_path.as_ref().unwrap().clone());
+            log::info!("get_status: file_path but no content: {}", file_name);
+            file_name
         } else if let Some(entry) = self.get_selected() {
+            log::info!("get_status: selected entry: {}", entry.name);
             entry.name.clone()
         } else {
-            "File Browser".to_string()
-        }
-    }
-        } else if self.selected_file_path.is_some() {
-            self.selected_file_path
-                .as_ref()
-                .and_then(|p| {
-                    std::path::Path::new(p)
-                        .file_name()
-                        .and_then(|n| n.to_str().map(String::from))
-                })
-                .unwrap_or_else(|| self.selected_file_path.as_ref().unwrap().clone())
-        } else if let Some(entry) = self.get_selected() {
-            entry.name.clone()
-        } else {
+            log::info!("get_status: File Browser (fallback)");
             "File Browser".to_string()
         }
     }
