@@ -53,12 +53,6 @@ jobs:
           toolchain: stable
           targets: ${{ matrix.target }}
 
-      - name: Install cross (Linux only)
-        if: runner.os == 'Linux'
-        shell: bash
-        run: |
-          cargo install cross --git https://github.com/cross-rs/cross
-
       - name: Install system dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -75,7 +69,7 @@ jobs:
         if: runner.os == 'Linux'
         shell: bash
         run: |
-          cross test --target ${{ matrix.target }} --verbose
+          cargo test --verbose
 
       - name: Build (macOS/Windows)
         if: runner.os != 'Linux'
@@ -87,7 +81,7 @@ jobs:
         if: runner.os == 'Linux'
         shell: bash
         run: |
-          cross build --release --target ${{ matrix.target }}
+          cargo build --release
 
       - name: Get version
         id: version
@@ -97,8 +91,16 @@ jobs:
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
           echo "version=${VERSION}"
           
-      - name: Upload binary (Unix)
-        if: runner.os != 'Windows'
+      - name: Upload binary (Linux)
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.artifact_suffix }}
+          path: target/release/tuiworker
+          retention-days: 30
+
+      - name: Upload binary (macOS)
+        if: runner.os == 'macOS'
         uses: actions/upload-artifact@v4
         with:
           name: binary-${{ matrix.artifact_suffix }}
