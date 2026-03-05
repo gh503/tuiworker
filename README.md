@@ -1,6 +1,19 @@
 # TUIWorker
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Rust](https://img.shields.io/badge/rust-1.80%2B-orange.svg)](https://www.rust-lang.org/)
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
+
 一个基于 Rust 的终端用户界面（TUI）工作站应用，为终端爱好者提供统一、高效的命令行工作环境。
+
+## ✨ 项目亮点
+
+- **纯 Rust 打造** - 所有功能模块使用 Rust 编写，不依赖外部命令行工具
+- **模块化架构** - 插件式设计，按需启用功能模块
+- **高性能** - 基于 ratatui 和 tokio，流畅的终端交互体验
+- **可定制** - 支持主题、快捷键、模块配置的完全自定义
+- **跨平台** - 支持 Linux、macOS 和 Windows
+- **本地优先** - 所有数据存储在本地，保护隐私
 
 ## 功能特性
 
@@ -93,36 +106,36 @@ tuiworker/
 ## 开发状态
 
 ### 当前状态
-- 📝 **规划阶段** - 项目架构和 API 设计完成
+- 🚧 **开发中** - 核心基础设施基本完成，FileBrowser 模块已实现核心功能
 
 ### 实现进度
 
-| 模块 | 状态 |
-|------|------|
-| 核心基础设施 | ⬜ 待开始 |
-| 日志模块 | ⬜ 待开始 |
-| 数据存储 | ⬜ 待开始 |
-| 配置管理 | ⬜ 待开始 |
-| TUI 渲染基础 | ⬜ 待开始 |
-| FileBrowser | ⬜ 待开始 |
-| Todo | ⬜ 待开始 |
-| Note | ⬜ 待开始 |
-| Diary | ⬜ 待开始 |
-| Terminal | ⬜ 待开始 |
-| Git | ⬜ 待开始 |
-| Music | ⬜ 待开始 |
-| Project | ⬜ 待开始 |
-| Mail | ⬜ 待开始 |
-| 快捷键系统 | ⬜ 待开始 |
-| 主题支持 | ⬜ 待开始 |
+| 模块 | 状态 | 说明 |
+|------|------|------|
+| 核心基础设施 | ✅ 完成 | Module trait、事件系统、应用框架 |
+| 日志模块 | ✅ 完成 | 文件日志、输出控制、日志轮转 |
+| 数据存储 | ✅ 完成 | sled 数据库封装 |
+| 配置管理 | ✅ 完成 | XDG 目录支持、TOML 配置 |
+| TUI 渲染基础 | ✅ 完成 | ratatui 集成、状态栏、标签栏 |
+| FileBrowser | 🟡 开发中 | 文件浏览、搜索、状态栏集成 |
+| Todo | ⬜ 框架 | 基础结构已实现 |
+| Note | ⬜ 框架 | 基础结构已实现 |
+| Diary | ⬜ 框架 | 基础结构已实现 |
+| Terminal | ⬜ 框架 | 基础结构已实现 |
+| Git | ⬜ 框架 | 基础结构已实现 |
+| Music | ⬜ 框架 | 基础结构已实现 |
+| Project | ⬜ 框架 | 基础结构已实现 |
+| Mail | ⬜ 框架 | 基础结构已实现 |
+| 快捷键系统 | ✅ 完成 | 模块间快捷键绑定 |
+| 主题支持 | 🟡 开发中 | 基础主题系统 |
 
 ### 发布计划
 
-- **v0.1.0** - MVP (5 核心模块)
-- **v0.2.0** - + Git, Terminal 多标签
-- **v0.3.0** - + Music 模块
-- **v0.4.0** - + Project 模块
-- **v0.5.0** - + Mail 模块
+- **v0.1.0** - MVP (FileBrowser + Todo + Note + Diary + Terminal)
+- **v0.2.0** - + Git 操作模块
+- **v0.3.0** - + Music 播放模块
+- **v0.4.0** - + Project 跟踪模块
+- **v0.5.0** - + Mail 邮件模块
 - **v1.0.0** - 完整功能稳定版
 
 ## 快捷键
@@ -234,5 +247,16 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 
 ---
 
-**当前版本**: 计划中
-**更新时间**: 2025-03-02
+**当前版本**: v0.1.0-alpha
+**更新时间**: 2026-03-05
+
+## 提高项目曝光度
+
+如果您觉得这个项目有用，欢迎帮助推广：
+
+1. **Star 本项目** - 增加 GitHub 搜索排名
+2. **分享给朋友** - 推荐给使用终端的开发者
+3. **撰写博客** - 如果您使用了本项目，欢迎分享使用体验
+4. **提交 Issue** - 报告 Bug 或提出功能建议
+5. **贡献代码** - 欢迎提交 PR 参与开发
+6. **推广渠道** - 在 Reddit (r/rust, r/linux), Hacker News, V2EX 等平台分享

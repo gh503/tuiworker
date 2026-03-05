@@ -71,4 +71,26 @@ impl CoreModule for FileBrowserModule {
         // FileBrowser 不需要清理资源
         Ok(())
     }
+
+    fn get_status(&self) -> String {
+        self.browser.get_status()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_module_get_status_delegates_to_browser() {
+        let temp_dir = std::env::temp_dir();
+        let module = FileBrowserModule::new(temp_dir);
+
+        let status = module.get_status();
+
+        assert!(!status.is_empty());
+
+        let status_duplicate = module.get_status();
+        assert_eq!(status, status_duplicate, "Status should be consistent");
+    }
 }
