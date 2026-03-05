@@ -30,6 +30,13 @@ pub struct FileBrowser {
     content_scroll_offset: usize,
     info_scroll_offset: usize,
     active_area: ActiveArea,
+    search_mode: bool,
+    search_query: String,
+    search_results: Vec<usize>,
+    search_result_index: usize,
+    content_search_query: String,
+    content_search_matches: Vec<usize>,
+    content_search_index: usize,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -64,6 +71,13 @@ impl FileBrowser {
             content_scroll_offset: 0,
             info_scroll_offset: 0,
             active_area: ActiveArea::FileList,
+            search_mode: false,
+            search_query: String::new(),
+            search_results: Vec::new(),
+            search_result_index: 0,
+            content_search_query: String::new(),
+            content_search_matches: Vec::new(),
+            content_search_index: 0,
         };
         let _ = browser.refresh();
         browser
@@ -302,11 +316,24 @@ impl FileBrowser {
         let split_x = area.x + (area.width as f32 * self.split_ratio) as u16;
         let split_x = split_x.max(area.x + 10).min(area.x + area.width - 10);
 
+        let search_height = if self.search_mode { 1 } else { 0 };
+
         let files_area = Rect {
             x: area.x,
             y: area.y,
             width: split_x - area.x,
-            height: area.height,
+            height: area.height.saturating_sub(search_height),
+        };
+
+        let search_bar_area = if self.search_mode {
+            Some(Rect {
+                x: area.x,
+                y: area.y + files_area.height,
+                width: split_x - area.x,
+                height: 1,
+            })
+        } else {
+            None
         };
 
         let split_bar_area = Rect {
@@ -324,8 +351,54 @@ impl FileBrowser {
         };
 
         self.render_file_list(frame, files_area, self.active_area == ActiveArea::FileList);
+        if let Some(search_area) = search_bar_area {
+            self.render_search_bar(frame, search_area);
+        }
         self.render_split_bar(frame, split_bar_area);
         self.render_info_panel(frame, info_area, self.active_area == ActiveArea::Content);
+    }
+
+    fn render_search_bar(&self, frame: &mut Frame, area: Rect) {
+        let (query, matches, current) = if self.active_area == ActiveArea::FileList {
+            (
+                &self.search_query,
+                &self.search_results,
+                self.search_result_index,
+            )
+        } else {
+            (
+                &self.content_search_query,
+                &self.content_search_matches,
+                self.content_search_index,
+            )
+        };
+
+        let search_type = if self.active_area == ActiveArea::FileList {
+            "File"
+        } else {
+            "Content"
+        };
+        let match_info = if matches.is_empty() {
+            format!("{}: [{}]", search_type, query)
+        } else {
+            format!(
+                "{}: [{}] ({}/{})",
+                search_type,
+                query,
+                current + 1,
+                matches.len()
+            )
+        };
+
+        let paragraph = Paragraph::new(match_info)
+            .style(Style::default().fg(Color::Yellow).bg(Color::DarkGray))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(Color::Yellow)),
+            );
+
+        frame.render_widget(paragraph, area);
     }
 
     fn render_file_list(&self, frame: &mut Frame, area: Rect, is_active: bool) {
@@ -703,7 +776,107 @@ impl FileBrowser {
         Ok(())
     }
 
+    fn start_search(&mut self) {
+        self.search_mode = true;
+        self.search_query.clear();
+        self.search_results.clear();
+        self.search_result_index = 0;
+    }
+
+    fn start_content_search(&mut self) {
+        self.search_mode = true;
+        self.content_search_query.clear();
+        self.content_search_matches.clear();
+        self.content_search_index = 0;
+    }
+
+    fn perform_file_search(&mut self) {
+        self.search_results.clear();
+        if self.search_query.is_empty() {
+            return;
+        }
+        let query_lower = self.search_query.to_lowercase();
+        for (i, entry) in self.entries.iter().enumerate() {
+            if entry.name.to_lowercase().contains(&query_lower) {
+                self.search_results.push(i);
+            }
+        }
+        if !self.search_results.is_empty() {
+            self.search_result_index = 0;
+            self.selected_index = self.search_results[0];
+        }
+    }
+
+    fn perform_content_search(&mut self) {
+        self.content_search_matches.clear();
+        if self.content_search_query.is_empty() || self.file_content.is_none() {
+            return;
+        }
+        let content = self.file_content.as_ref().unwrap();
+        let query_lower = self.content_search_query.to_lowercase();
+        for (i, line) in content.lines().enumerate() {
+            if line.to_lowercase().contains(&query_lower) {
+                self.content_search_matches.push(i);
+            }
+        }
+        if !self.content_search_matches.is_empty() {
+            self.content_search_index = 0;
+            self.content_scroll_offset = self.content_search_matches[0];
+        }
+    }
+
+    fn handle_search_key(&mut self, key: KeyEvent) -> Action {
+        match key.code {
+            KeyCode::Esc => {
+                self.search_mode = false;
+                Action::Consumed
+            }
+            KeyCode::Enter => {
+                if self.active_area == ActiveArea::FileList {
+                    self.search_result_index =
+                        (self.search_result_index + 1) % self.search_results.len().max(1);
+                    if !self.search_results.is_empty() {
+                        self.selected_index = self.search_results[self.search_result_index];
+                    }
+                } else {
+                    self.content_search_index =
+                        (self.content_search_index + 1) % self.content_search_matches.len().max(1);
+                    if !self.content_search_matches.is_empty() {
+                        self.content_scroll_offset =
+                            self.content_search_matches[self.content_search_index];
+                    }
+                }
+                Action::Consumed
+            }
+            KeyCode::Backspace => {
+                if self.active_area == ActiveArea::FileList {
+                    self.search_query.pop();
+                    self.perform_file_search();
+                } else {
+                    self.content_search_query.pop();
+                    self.perform_content_search();
+                }
+                Action::Consumed
+            }
+            KeyCode::Char(c) => {
+                if self.active_area == ActiveArea::FileList {
+                    self.search_query.push(c);
+                    self.perform_file_search();
+                } else {
+                    self.content_search_query.push(c);
+                    self.perform_content_search();
+                }
+                Action::Consumed
+            }
+            _ => Action::None,
+        }
+    }
+
     pub fn handle_key_event(&mut self, key: KeyEvent) -> Action {
+        if self.search_mode {
+            return self.handle_search_key(key);
+        }
+
         match key.code {
             KeyCode::Esc | KeyCode::Char('c') => {
                 if self.file_content.is_some() {
@@ -723,6 +896,18 @@ impl FileBrowser {
                     }
                     ActiveArea::Content => ActiveArea::FileList,
                 };
+                Action::Consumed
+            }
+            KeyCode::Char('f')
+                if key
+                    .modifiers
+                    .contains(crossterm::event::KeyModifiers::CONTROL) =>
+            {
+                if self.active_area == ActiveArea::Content && self.file_content.is_some() {
+                    self.start_content_search();
+                } else {
+                    self.start_search();
+                }
                 Action::Consumed
             }
             KeyCode::Up | KeyCode::Char('k') => {
@@ -845,7 +1030,7 @@ impl FileBrowser {
                     SortBy::Modified => "modified",
                 };
                 Action::ShowMessage(core::event::Message::Info(
-                    format!("j/k: Navigate | Enter: Enter dir | o: Open | c: Close file | Esc: Close file | h: Toggle hidden | s: Sort ({}) | u: Up | Tab: Switch focus", sort_mode)
+                    format!("j/k: Navigate | Enter: Enter dir | o: Open | c: Close file | Esc: Close file | h: Toggle hidden | s: Sort ({}) | u: Up | Tab: Switch focus | Ctrl+F: Search", sort_mode)
                 ))
             }
             _ => Action::None,
@@ -881,6 +1066,10 @@ impl FileBrowser {
             Shortcut {
                 key: "Tab",
                 description: "Switch focus",
+            },
+            Shortcut {
+                key: "Ctrl+F",
+                description: "Search",
             },
         ]
     }
