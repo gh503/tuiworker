@@ -318,51 +318,87 @@ impl FileBrowser {
 
         let search_bar_height = if self.search_mode { 1 } else { 0 };
 
-        let files_area = Rect {
-            x: area.x,
-            y: area.y,
-            width: split_x - area.x,
-            height: area.height.saturating_sub(search_bar_height),
-        };
+        let (files_area, info_area, split_bar_area) = if self.search_mode {
+            if self.active_area == ActiveArea::FileList {
+                let search_bar_area = Rect {
+                    x: area.x,
+                    y: area.y,
+                    width: split_x - area.x,
+                    height: 1,
+                };
+                self.render_search_bar(frame, search_bar_area);
 
-        let split_bar_area = Rect {
-            x: split_x,
-            y: area.y,
-            width: 1,
-            height: area.height.saturating_sub(search_bar_height),
-        };
+                let files_area = Rect {
+                    x: area.x,
+                    y: area.y + 1,
+                    width: split_x - area.x,
+                    height: area.height - 1,
+                };
+                let split_bar_area = Rect {
+                    x: split_x,
+                    y: area.y + 1,
+                    width: 1,
+                    height: area.height - 1,
+                };
+                let info_area = Rect {
+                    x: split_x + 1,
+                    y: area.y + 1,
+                    width: area.width - (split_x - area.x) - 1,
+                    height: area.height - 1,
+                };
+                (files_area, info_area, split_bar_area)
+            } else {
+                let search_bar_area = Rect {
+                    x: split_x + 1,
+                    y: area.y,
+                    width: area.width - (split_x - area.x) - 1,
+                    height: 1,
+                };
+                self.render_search_bar(frame, search_bar_area);
 
-        let info_area = Rect {
-            x: split_x + 1,
-            y: area.y,
-            width: area.width - (split_x - area.x) - 1,
-            height: area.height.saturating_sub(search_bar_height),
-        };
-
-        if self.search_mode {
-            let search_bar_area = Rect {
+                let files_area = Rect {
+                    x: area.x,
+                    y: area.y,
+                    width: split_x - area.x,
+                    height: area.height - 1,
+                };
+                let split_bar_area = Rect {
+                    x: split_x,
+                    y: area.y,
+                    width: 1,
+                    height: area.height - 1,
+                };
+                let info_area = Rect {
+                    x: split_x + 1,
+                    y: area.y + 1,
+                    width: area.width - (split_x - area.x) - 1,
+                    height: area.height - 1,
+                };
+                (files_area, info_area, split_bar_area)
+            }
+        } else {
+            let files_area = Rect {
                 x: area.x,
                 y: area.y,
                 width: split_x - area.x,
-                height: 1,
+                height: area.height,
             };
-            self.render_search_bar(frame, search_bar_area);
-
-            let files_area_with_offset = Rect {
-                x: files_area.x,
-                y: files_area.y + 1,
-                width: files_area.width,
-                height: files_area.height.saturating_sub(1),
+            let split_bar_area = Rect {
+                x: split_x,
+                y: area.y,
+                width: 1,
+                height: area.height,
             };
-            self.render_file_list(
-                frame,
-                files_area_with_offset,
-                self.active_area == ActiveArea::FileList,
-            );
-        } else {
-            self.render_file_list(frame, files_area, self.active_area == ActiveArea::FileList);
-        }
+            let info_area = Rect {
+                x: split_x + 1,
+                y: area.y,
+                width: area.width - (split_x - area.x) - 1,
+                height: area.height,
+            };
+            (files_area, info_area, split_bar_area)
+        };
 
+        self.render_file_list(frame, files_area, self.active_area == ActiveArea::FileList);
         self.render_split_bar(frame, split_bar_area);
         self.render_info_panel(frame, info_area, self.active_area == ActiveArea::Content);
     }
