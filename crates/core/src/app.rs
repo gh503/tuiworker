@@ -546,8 +546,8 @@ impl App {
     }
 
     fn draw_dialog(&mut self, frame: &mut ratatui::prelude::Frame, area: Rect) {
-        let overlay_width = 60.min(area.width - 4);
-        let overlay_height = 20.min(area.height - 4);
+        let overlay_width = 70.min(area.width - 4);
+        let overlay_height = 15.min(area.height - 4);
 
         let overlay_area = Rect {
             x: area.x + (area.width.saturating_sub(overlay_width)) / 2,
@@ -557,13 +557,42 @@ impl App {
         };
 
         let content = if let Some(msg) = &self.dialog_message {
-            vec![
-                Line::from("Message"),
+            let lines: Vec<Line> = msg
+                .split('|')
+                .map(|s| {
+                    let parts: Vec<&str> = s.splitn(2, ':').collect();
+                    if parts.len() == 2 {
+                        Line::from(vec![
+                            Span::styled(
+                                format!("{:8}", parts[0]),
+                                Style::default()
+                                    .fg(Color::Yellow)
+                                    .add_modifier(ratatui::style::Modifier::BOLD),
+                            ),
+                            Span::raw(parts[1]),
+                        ])
+                    } else {
+                        Line::from(s.trim())
+                    }
+                })
+                .collect();
+
+            let mut result = vec![
+                Line::from(vec![Span::styled(
+                    "Help",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(ratatui::style::Modifier::BOLD),
+                )]),
                 Line::from(""),
-                Line::from(msg.clone()),
-                Line::from(""),
-                Line::from("[Enter/Esc] Close"),
-            ]
+            ];
+            result.extend(lines);
+            result.push(Line::from(""));
+            result.push(Line::from(vec![
+                Span::styled("[Enter/Esc]", Style::default().fg(Color::Gray)),
+                Span::raw("  Close"),
+            ]));
+            result
         } else {
             vec![Line::from("")]
         };
@@ -571,7 +600,7 @@ impl App {
         let paragraph = Paragraph::new(content)
             .block(
                 Block::default()
-                    .title("Dialog")
+                    .title(" Help ")
                     .borders(Borders::ALL)
                     .border_style(
                         Style::default()
@@ -579,7 +608,7 @@ impl App {
                             .add_modifier(ratatui::style::Modifier::BOLD),
                     ),
             )
-            .alignment(Alignment::Center)
+            .alignment(Alignment::Left)
             .wrap(Wrap { trim: true });
 
         frame.render_widget(Clear, overlay_area);
