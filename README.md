@@ -244,6 +244,53 @@ cargo build --release
 make package-all
 ```
 
+### 发布流程
+
+**自动化发布**（推荐）:
+
+1. **打 tag**（会自动创建 draft release）:
+   ```bash
+   git tag v0.1.0-alpha
+   git push origin v0.1.0-alpha
+   ```
+
+2. **在 GitHub 上发布**:
+   - 访问 https://github.com/gh503/tuiworker/releases
+   - 查看自动生成的 Release Notes
+   - 点击 "Publish release" 按钮
+
+3. **自动构建并上传**:
+   - 5 个平台的二进制文件
+   - DEB 和 RPM 包
+   - 所有文件自动添加到 Release
+
+**Commit Message 规范**（影响自动生成的 Release Notes）:
+
+```
+<type>: <subject>
+
+<body>
+
+<footer>
+```
+
+**Type 类型**:
+- `feat`: 新功能
+- `fix`: Bug 修复
+- `docs`: 文档更新
+- `style`: 代码格式（不影响功能）
+- `refactor`: 重构
+- `perf`: 性能优化
+- `test`: 测试相关
+- `chore`: 构建过程或工具变更
+
+**示例**:
+```bash
+git commit -m "feat(filebrowser): 添加按文件大小排序功能"
+git commit -m "fix: 修复在 macOS 上的显示问题"
+git commit -m "docs: 更新 README 安装说明"
+```
+
 ## 文档
 
 - [产品需求文档](docs/prd.txt) - 系统顶层设计
