@@ -38,7 +38,7 @@ assets = [
   { source = "../README.md", dest = "/usr/share/doc/tuiworker/", mode = "644", doc = true },
   { source = "../LICENSE", dest = "/usr/share/licenses/tuiworker/", mode = "644" },
 ]
-  auto-req = "no"
+auto-req = "no"
 requires = "openssl, alsa-lib"
 
 [features]
