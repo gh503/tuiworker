@@ -16,14 +16,14 @@ path = "main.rs"
 name = "tuiworker"
 maintainer = "gh503 <angus_robot@163.com>"
 copyright = "2025, tuiworker contributors"
-license-file = ["../LICENSE", "3"]
-extended-description-file = "../README.md"
+license-file = ["LICENSE", "3"]
+extended-description-file = "README.md"
 section = "utils"
 priority = "optional"
 assets = [
   ["target/release/tuiworker", "usr/bin/", "755"],
-  ["../README.md", "usr/share/doc/tuiworker/", "644"],
-  ["../LICENSE", "usr/share/doc/tuiworker/", "644"],
+  ["README.md", "usr/share/doc/tuiworker/", "644"],
+  ["LICENSE", "usr/share/doc/tuiworker/", "644"],
 ]
 depends = "$auto"
 
@@ -35,9 +35,24 @@ summary = "A terminal user interface (TUI) workstation application"
 description = "TUIWorker is a terminal workspace"
 assets = [
   { source = "target/release/tuiworker", dest = "/usr/bin/", mode = "755" },
+  { source = "README.md", dest = "/usr/share/doc/tuiworker/", mode = "644", doc = true },
+  { source = "LICENSE", dest = "/usr/share/licenses/tuiworker/", mode = "644" },
+]
+depends = "$auto"
+
+# RPM package configuration for Fedora/RHEL/CentOS
+[package.metadata.generate-rpm]
+name = "tuiworker"
+license = "MIT"
+summary = "A terminal user interface (TUI) workstation application"
+description = "TUIWorker is a terminal workspace"
+assets = [
+  { source = "target/release/tuiworker", dest = "/usr/bin/tuiworker", mode = "755" },
   { source = "../README.md", dest = "/usr/share/doc/tuiworker/", mode = "644", doc = true },
   { source = "../LICENSE", dest = "/usr/share/licenses/tuiworker/", mode = "644" },
 ]
+auto-req = "no"
+requires = ["openssl", "alsa-lib"]
 
 [features]
 default = ["music", "git", "terminal"]
