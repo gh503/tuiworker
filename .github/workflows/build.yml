@@ -149,8 +149,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev libasound2-dev
           cargo install cargo-deb
-          # 从根目录运行并指定manifest，这样DEB生成在target/debian/
-          cargo deb --manifest-path=src/Cargo.toml --no-build
+          # 从src目录运行，保持与RPM一致
+          cd src && cargo deb --no-build
 
       - name: Build rpm package
         run: |
@@ -163,10 +163,8 @@ jobs:
           echo "=== Generated packages ==="
           echo "Source binary:"
           ls -lh artifacts/binary-linux/tuiworker
-          echo "Copied binary:"
-          ls -lh target/release/tuiworker || echo "Binary not found"
           echo "DEB packages:"
-          ls -lh target/debian/*.deb || echo "No DEB files found"
+          ls -lh src/target/debian/*.deb || echo "No DEB files found"
           echo "RPM packages:"
           ls -lh src/target/generate-rpm/*.rpm || echo "No RPM files found"
 
@@ -186,7 +184,7 @@ jobs:
           tag_name: ${{ github.ref_name }}
           files: |
             release-artifacts/*
-            target/debian/*.deb
+            src/target/debian/*.deb
             src/target/generate-rpm/*.rpm
           generate_release_notes: true
           draft: false
