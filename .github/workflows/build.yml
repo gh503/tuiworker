@@ -183,13 +183,24 @@ jobs:
           echo "RPM packages:"
           find src/target -name "*.rpm" -type f -exec ls -lh {} \; || echo "No RPM files found"
 
+      - name: Prepare artifacts for upload
+        run: |
+          echo "Renaming binaries to avoid conflicts..."
+          mkdir -p release-artifacts
+          cp artifacts/binary-linux-glibc2.35/tuiworker release-artifacts/tuiworker-linux-glibc2.35
+          cp artifacts/binary-linux-glibc2.39/tuiworker release-artifacts/tuiworker-linux-glibc2.39
+          cp artifacts/binary-macos-x86_64/tuiworker release-artifacts/tuiworker-macos-x86_64
+          cp artifacts/binary-macos-arm64/tuiworker release-artifacts/tuiworker-macos-arm64
+          cp artifacts/binary-windows/tuiworker.exe release-artifacts/tuiworker-windows.exe
+          ls -lh release-artifacts/
+
       - name: Upload to Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ github.ref_name }}
           files: |
-            artifacts/binary-*/tuiworker*
-            target/**/*.deb
+            release-artifacts/*
+            target/*.deb
             target/**/*.rpm
           generate_release_notes: true
           draft: false
