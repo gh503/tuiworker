@@ -135,28 +135,45 @@ jobs:
           echo "Downloaded artifacts:"
           ls -lh artifacts/
 
+      - name: Prepare binary for packaging
+        run: |
+          echo "=== Copying Linux binary for packaging ==="
+          mkdir -p src/target/release
+          # 使用任一Linux二进制（两个glibc版本应该兼容）
+          if [ -f artifacts/binary-linux-glibc2.39/tuiworker ]; then
+            cp artifacts/binary-linux-glibc2.39/tuiworker src/target/release/tuiworker
+          elif [ -f artifacts/binary-linux-glibc2.35/tuiworker ]; then
+            cp artifacts/binary-linux-glibc2.35/tuiworker src/target/release/tuiworker
+          else
+            echo "ERROR: No Linux binary found!"
+            exit 1
+          fi
+          ls -lh src/target/release/tuiworker
+          chmod +x src/target/release/tuiworker
+
       - name: Build deb package
         run: |
-          cd src && sudo apt-get update && sudo apt-get install -y pkg-config libssl-dev libasound2-dev && cargo install cargo-deb && cargo build --release && cargo deb --no-build
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev libasound2-dev
+          cargo install cargo-deb
+          cd src && cargo deb --no-build
 
       - name: Build rpm package
         run: |
-          cd src && cargo install cargo-generate-rpm
-          cargo clean && cargo build --release --verbose
-          ls -lah target/release/tuiworker
-          cargo generate-rpm --verbose
+          cargo install cargo-generate-rpm
+          cd src && cargo generate-rpm
 
       - name: List generated packages
         run: |
-          echo "=== Generated files ==="
-          echo "Binary:"
+          echo "=== Generated packages ==="
+          echo "Source binary:"
+          ls -lh artifacts/binary-linux-*/tuiworker
+          echo "Copied binary:"
           ls -lh src/target/release/tuiworker || echo "Binary not found"
           echo "DEB packages:"
           ls -lh src/target/debian/*.deb || echo "No DEB files found"
           echo "RPM packages:"
           find src/target -name "*.rpm" -type f -exec ls -lh {} \; || echo "No RPM files found"
-          echo "Target directory contents:"
-          find src/target -type f -name "*.rpm" -o -name "*.deb" 2>/dev/null
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v1
@@ -168,5 +185,5 @@ jobs:
           generate_release_notes: true
           draft: false
           prerelease: false
-          fail_on_unmatched_files: false
+          fail_on_unmatched_files: true
           token: ${{ secrets.GITHUB_TOKEN }}
