@@ -141,13 +141,17 @@ jobs:
 
       - name: Build rpm package
         run: |
-          cd src && cargo install cargo-generate-rpm && cargo build --release && cargo generate-rpm --output=target/rpm/tuiworker.rpm
+          cd src && cargo install cargo-generate-rpm && cargo build --release && cargo generate-rpm
 
       - name: List generated packages
         run: |
           echo "=== Generated files ==="
-          ls -lh src/target/debian/ || echo "No DEB files found"
-          ls -lh src/target/rpm/ || echo "No RPM files found"
+          echo "Binary:"
+          ls -lh src/target/release/tuiworker || echo "Binary not found"
+          echo "DEB packages:"
+          ls -lh src/target/debian/*.deb || echo "No DEB files found"
+          echo "RPM packages:"
+          find src/target -name "*.rpm" -exec ls -lh {} \; || echo "No RPM files found"
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v1
@@ -156,8 +160,9 @@ jobs:
             artifacts/binary-*/tuiworker*
             src/target/debian/*.deb
             src/target/rpm/*.rpm
+            src/target/release/rpmbuild/RPMS/**/*.rpm
           generate_release_notes: true
           draft: false
           prerelease: false
-          fail_on_unmatched_files: true
+          fail_on_unmatched_files: false
           token: ${{ secrets.GITHUB_TOKEN }}
