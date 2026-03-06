@@ -189,10 +189,10 @@ jobs:
           tag_name: ${{ github.ref_name }}
           files: |
             artifacts/binary-*/tuiworker*
-            src/target/debian/*.deb
-            src/target/**/*.rpm
+            target/**/*.deb
+            target/**/*.rpm
           generate_release_notes: true
           draft: false
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') || contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
-          fail_on_unmatched_files: true
+          fail_on_unmatched_files: false
           token: ${{ secrets.GITHUB_TOKEN }}
