@@ -18,11 +18,7 @@ jobs:
         include:
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
-            artifact_suffix: linux-glibc2.35
-
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            artifact_suffix: linux-glibc2.39
+            artifact_suffix: linux
 
           - os: macos-latest
             target: x86_64-apple-darwin
@@ -139,23 +135,14 @@ jobs:
         run: |
           echo "=== Copying Linux binary for packaging ==="
           mkdir -p target/release
-          # 使用任一Linux二进制
-          if [ -f artifacts/binary-linux-glibc2.39/tuiworker ]; then
-            cp artifacts/binary-linux-glibc2.39/tuiworker target/release/tuiworker
-          elif [ -f artifacts/binary-linux-glibc2.35/tuiworker ]; then
-            cp artifacts/binary-linux-glibc2.35/tuiworker target/release/tuiworker
-          else
-            echo "ERROR: No Linux binary found!"
-            exit 1
-          fi
+          # 使用Linux二进制（glibc 2.35，兼容2.39及更新版本）
+          cp artifacts/binary-linux/tuiworker target/release/tuiworker
           ls -lh target/release/tuiworker
           chmod +x target/release/tuiworker
-          # 也复制到 src/target/release 以防 RPM 需要不同的路径
+          # 也复制到 src/target/release 以备RPM使用
           mkdir -p src/target/release
           cp target/release/tuiworker src/target/release/tuiworker
-          echo "Binary copied to:"
-          echo "  - target/release/tuiworker (for cargo-deb)"
-          echo "  - src/target/release/tuiworker (for cargo-generate-rpm)"
+          echo "Binary copied to: target/release/tuiworker"
 
       - name: Build deb package
         run: |
@@ -175,20 +162,19 @@ jobs:
         run: |
           echo "=== Generated packages ==="
           echo "Source binary:"
-          ls -lh artifacts/binary-linux-*/tuiworker
+          ls -lh artifacts/binary-linux/tuiworker
           echo "Copied binary:"
           ls -lh src/target/release/tuiworker || echo "Binary not found"
           echo "DEB packages:"
           ls -lh src/target/debian/*.deb || echo "No DEB files found"
           echo "RPM packages:"
-          find src/target -name "*.rpm" -type f -exec ls -lh {} \; || echo "No RPM files found"
+          ls -lh src/target/generate-rpm/*.rpm || echo "No RPM files found"
 
       - name: Prepare artifacts for upload
         run: |
           echo "Renaming binaries to avoid conflicts..."
           mkdir -p release-artifacts
-          cp artifacts/binary-linux-glibc2.35/tuiworker release-artifacts/tuiworker-linux-glibc2.35
-          cp artifacts/binary-linux-glibc2.39/tuiworker release-artifacts/tuiworker-linux-glibc2.39
+          cp artifacts/binary-linux/tuiworker release-artifacts/tuiworker-linux
           cp artifacts/binary-macos-x86_64/tuiworker release-artifacts/tuiworker-macos-x86_64
           cp artifacts/binary-macos-arm64/tuiworker release-artifacts/tuiworker-macos-arm64
           cp artifacts/binary-windows/tuiworker.exe release-artifacts/tuiworker-windows.exe
@@ -200,8 +186,8 @@ jobs:
           tag_name: ${{ github.ref_name }}
           files: |
             release-artifacts/*
-            target/*.deb
-            target/**/*.rpm
+            src/target/debian/*.deb
+            src/target/generate-rpm/*.rpm
           generate_release_notes: true
           draft: false
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') || contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
