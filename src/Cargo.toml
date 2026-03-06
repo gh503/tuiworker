@@ -16,14 +16,14 @@ path = "main.rs"
 name = "tuiworker"
 maintainer = "gh503 <angus_robot@163.com>"
 copyright = "2025, tuiworker contributors"
-license-file = ["LICENSE", "3"]
-extended-description-file = "README.md"
+license-file = ["../LICENSE"]
+extended-description-file = ["../README.md"]
 section = "utils"
 priority = "optional"
 assets = [
   ["target/release/tuiworker", "usr/bin/", "755"],
-  ["README.md", "usr/share/doc/tuiworker/", "644"],
-  ["LICENSE", "usr/share/doc/tuiworker/", "644"],
+  ["../README.md", "usr/share/doc/tuiworker/", "644"],
+  ["../LICENSE", "usr/share/doc/tuiworker/", "644"],
 ]
 depends = "$auto"
 
