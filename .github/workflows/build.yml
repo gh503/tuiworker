@@ -116,7 +116,7 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'release'
+    if: github.event_name == 'release'
 
     permissions:
       contents: write
