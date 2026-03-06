@@ -141,7 +141,13 @@ jobs:
 
       - name: Build rpm package
         run: |
-          cd src && cargo install cargo-generate-rpm && cargo generate-rpm --output=target/rpm/tuiworker.rpm
+          cd src && cargo install cargo-generate-rpm && cargo build --release && cargo generate-rpm --output=target/rpm/tuiworker.rpm
+
+      - name: List generated packages
+        run: |
+          echo "=== Generated files ==="
+          ls -lh src/target/debian/ || echo "No DEB files found"
+          ls -lh src/target/rpm/ || echo "No RPM files found"
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v1
