@@ -156,12 +156,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev libasound2-dev
           cargo install cargo-deb
-          cd src && cargo deb --no-build
+          # 从项目根目录运行 cargo deb
+          cargo deb --no-build
 
       - name: Build rpm package
         run: |
           cargo install cargo-generate-rpm
-          cd src && cargo generate-rpm
+          # 使用 --manifest-path 指定 src/Cargo.toml，从根目录运行
+          cargo generate-rpm --manifest-path=src/Cargo.toml
 
       - name: List generated packages
         run: |
