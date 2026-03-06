@@ -184,7 +184,7 @@ jobs:
           tag_name: ${{ github.ref_name }}
           files: |
             release-artifacts/*
-            src/target/debian/*.deb
+            target/debian/*.deb
             src/target/generate-rpm/*.rpm
           generate_release_notes: true
           draft: false
