@@ -38,19 +38,6 @@ assets = [
   { source = "README.md", dest = "/usr/share/doc/tuiworker/", mode = "644", doc = true },
   { source = "LICENSE", dest = "/usr/share/licenses/tuiworker/", mode = "644" },
 ]
-depends = "$auto"
-
-# RPM package configuration for Fedora/RHEL/CentOS
-[package.metadata.generate-rpm]
-name = "tuiworker"
-license = "MIT"
-summary = "A terminal user interface (TUI) workstation application"
-description = "TUIWorker is a terminal workspace"
-assets = [
-  { source = "target/release/tuiworker", dest = "/usr/bin/tuiworker", mode = "755" },
-  { source = "../README.md", dest = "/usr/share/doc/tuiworker/", mode = "644", doc = true },
-  { source = "../LICENSE", dest = "/usr/share/licenses/tuiworker/", mode = "644" },
-]
 auto-req = "no"
 requires = ["openssl", "alsa-lib"]
 
