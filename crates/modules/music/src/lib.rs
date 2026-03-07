@@ -157,12 +157,20 @@ impl MusicModule {
 
     /// Pause playback
     pub fn pause(&mut self) -> Result<(), anyhow::Error> {
-        self.controller.pause().map_err(|e| anyhow::anyhow!(e))
+        log::info!("[Music] Pausing playback");
+        self.controller.pause().map_err(|e| {
+            log::error!("[Music] Failed to pause playback: {}", e);
+            anyhow::anyhow!(e)
+        })
     }
 
     /// Resume playback
     pub fn resume(&mut self) -> Result<(), anyhow::Error> {
-        self.controller.resume().map_err(|e| anyhow::anyhow!(e))
+        log::info!("[Music] Resuming playback");
+        self.controller.resume().map_err(|e| {
+            log::error!("[Music] Failed to resume playback: {}", e);
+            anyhow::anyhow!(e)
+        })
     }
 
     /// Stop playback
@@ -210,6 +218,8 @@ impl MusicModule {
 
     /// Switch music source
     pub fn switch_source(&mut self) {
+        let old_source = self.get_source_name().to_string();
+
         self.current_source = match self.current_source {
             SourceType::Local => SourceType::QqMusic,
             SourceType::QqMusic => SourceType::NetEaseMusic,
@@ -217,7 +227,16 @@ impl MusicModule {
             SourceType::Nas { .. } => SourceType::Local,
         };
 
-        log::info!("[Music] Switched to source: {}", self.get_source_name());
+        let new_source = self.get_source_name();
+        log::info!("[Music] Switched from {} to {}", old_source, new_source);
+
+        if new_source == "NetEase Music" {
+            log::info!("[Music] NetEase Music selected. Note: Search functionality is not yet implemented.");
+            log::info!("[Music] To use NetEase Music, you need to enable it in config: ~/.config/tuiworker/music.toml");
+        }
+
+        self.controller.clear_queue();
+        self.selected_index = 0;
     }
 
     /// Navigate up
@@ -251,11 +270,20 @@ impl MusicModule {
         ];
 
         if tracks.is_empty() {
-            lines.push(Line::from("没有找到音乐文件"));
-            lines.push(Line::from(format!(
-                "音乐目录: {}",
-                self.music_dir.display()
-            )));
+            if self.current_source == SourceType::NetEaseMusic {
+                lines.push(Line::from("NetEase Music: 搜索功能尚未实现"));
+                lines.push(Line::from("提示: 在 ~/.config/tuiworker/music.toml 中配置"));
+            } else if self.current_source == SourceType::QqMusic {
+                lines.push(Line::from("QQ Music: 搜索功能尚未实现"));
+            } else if let SourceType::Nas { .. } = self.current_source {
+                lines.push(Line::from("NAS: 请配置网络存储或手动添加文件"));
+            } else {
+                lines.push(Line::from("没有找到音乐文件"));
+                lines.push(Line::from(format!(
+                    "音乐目录: {}",
+                    self.music_dir.display()
+                )));
+            }
         } else {
             let visible_count = area.height.saturating_sub(3) as usize / 2;
             let start = self.selected_index.saturating_sub(visible_count / 2);
@@ -517,16 +545,40 @@ impl MusicModule {
     fn handle_key_event(&mut self, key: KeyEvent) -> Action {
         match key.code {
             KeyCode::Char(' ') => {
-                match self.controller.get_state() {
-                    PlaybackState::Playing => self.pause().unwrap(),
-                    PlaybackState::Paused => self.resume().unwrap(),
+                let state_before = self.controller.get_state();
+                log::info!(
+                    "[Music] Space key pressed, current state: {:?}",
+                    state_before
+                );
+
+                match state_before {
+                    PlaybackState::Playing => {
+                        if let Err(e) = self.pause() {
+                            log::error!("[Music] Pause error: {}", e);
+                        } else {
+                            log::info!("[Music] Paused successfully");
+                        }
+                    }
+                    PlaybackState::Paused => {
+                        if let Err(e) = self.resume() {
+                            log::error!("[Music] Resume error: {}", e);
+                        } else {
+                            log::info!("[Music] Resumed successfully");
+                        }
+                    }
                     _ => {
                         if !self.controller.get_queue().is_empty() {
+                            log::info!("[Music] Playing track at index {}", self.selected_index);
                             self.play(self.selected_index);
+                        } else {
+                            log::warn!("[Music] Cannot play - queue is empty");
                         }
                     }
                 }
-                Action::None
+
+                let state_after = self.controller.get_state();
+                log::info!("[Music] State after space: {:?}", state_after);
+                Action::Consumed
             }
             KeyCode::Char('>') => {
                 self.set_volume(self.controller.get_volume() + 0.1);
@@ -601,8 +653,6 @@ impl CoreModule for MusicModule {
                 Constraint::Length(3),
             ])
             .split(area);
-
-        let current_track = self.controller.get_current_track();
 
         self.draw_player(frame, chunks[0]);
         self.draw_lyrics(frame, chunks[1]);

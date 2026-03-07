@@ -123,6 +123,8 @@ impl Track {
             .unwrap_or("")
             .to_string();
 
+        let lyrics = Self::load_lyrics_from_file(&path);
+
         Self {
             id,
             path,
@@ -133,7 +135,21 @@ impl Track {
             source_type: SourceType::Local,
             cover_url: None,
             parent,
-            lyrics: None,
+            lyrics,
+        }
+    }
+
+    fn load_lyrics_from_file(audio_path: &std::path::Path) -> Option<String> {
+        let lyrics_path = audio_path.with_extension("lrc");
+
+        if !lyrics_path.exists() {
+            return None;
+        }
+
+        if let Ok(content) = std::fs::read_to_string(&lyrics_path) {
+            Some(content)
+        } else {
+            None
         }
     }
 
