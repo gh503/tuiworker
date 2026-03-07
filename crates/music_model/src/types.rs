@@ -79,6 +79,7 @@ pub struct Track {
     pub duration: Option<Duration>,
     pub source_type: SourceType,
     pub cover_url: Option<String>,
+    pub parent: String,
 }
 
 impl Track {
@@ -91,6 +92,13 @@ impl Track {
         duration: Option<Duration>,
         source_type: SourceType,
     ) -> Self {
+        let parent = path
+            .parent()
+            .and_then(|p| p.file_name())
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_string();
+
         Self {
             id,
             path,
@@ -100,20 +108,29 @@ impl Track {
             duration,
             source_type,
             cover_url: None,
+            parent,
         }
     }
 
     pub fn local(path: PathBuf, title: String, artist: String) -> Self {
         let id = uuid::Uuid::new_v4().to_string();
+        let parent = path
+            .parent()
+            .and_then(|p| p.file_name())
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_string();
+
         Self {
             id,
             path,
             title,
             artist,
-            album: String::from("Unknown"),
+            album: String::from("-"),
             duration: None,
             source_type: SourceType::Local,
             cover_url: None,
+            parent,
         }
     }
 }

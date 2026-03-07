@@ -26,6 +26,7 @@ pub trait MusicSource {
     fn supports_streaming(&self) -> bool;
 
     fn set_event_dispatcher(&mut self, dispatcher: Arc<crate::events::EventDispatcher>);
+    fn set_volume(&mut self, volume: f32);
 }
 
 /// Credentials for music sources
@@ -208,5 +209,11 @@ impl MusicSource for LocalSource {
 
     fn set_event_dispatcher(&mut self, dispatcher: Arc<crate::events::EventDispatcher>) {
         self.dispatcher = Some(dispatcher);
+    }
+
+    fn set_volume(&mut self, volume: f32) {
+        if let Some(sink) = &self.rodio_sink {
+            sink.lock().set_volume(volume);
+        }
     }
 }

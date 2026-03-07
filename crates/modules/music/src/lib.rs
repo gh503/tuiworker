@@ -93,6 +93,12 @@ impl MusicModule {
         Ok(())
     }
 
+    /// Clear and reload music from directory
+    pub fn reload_music(&mut self) -> anyhow::Result<()> {
+        self.controller.clear_queue();
+        self.load_music()
+    }
+
     /// Recursively load directory
     fn load_directory_recursive(
         &mut self,
@@ -238,11 +244,18 @@ impl MusicModule {
                     Style::default()
                 };
 
+                let path_display = if track.parent.is_empty() {
+                    String::from("📁")
+                } else {
+                    format!("📁 {}", track.parent)
+                };
+
                 let line = format!(
-                    "{} {} - {}",
+                    "{} {} - {} | {}",
                     if is_current { "►" } else { " " },
                     track.artist,
-                    track.title
+                    track.title,
+                    path_display
                 );
 
                 lines.push(Line::from(vec![Span::styled(line, style)]));
@@ -485,7 +498,7 @@ impl CoreModule for MusicModule {
     }
 
     fn init(&mut self) -> anyhow::Result<()> {
-        self.load_music()?;
+        self.reload_music()?;
         Ok(())
     }
 

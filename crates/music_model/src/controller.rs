@@ -115,16 +115,15 @@ impl PlayerController {
 
     pub fn set_volume(&mut self, volume: f32) {
         let old_volume = *self.volume.lock();
-        *self.volume.lock() = volume.clamp(0.0, 1.0);
+        let new_volume = volume.clamp(0.0, 1.0);
+        *self.volume.lock() = new_volume;
 
         if let Some(source) = &mut self.current_source {
-            if source.supports_streaming() {
-                source.pause().ok();
-            }
+            source.set_volume(new_volume);
         }
 
         self.event_dispatcher
-            .dispatch(MusicEvent::VolumeChanged(*self.volume.lock(), old_volume));
+            .dispatch(MusicEvent::VolumeChanged(new_volume, old_volume));
     }
 
     pub fn get_volume(&self) -> f32 {
@@ -333,6 +332,12 @@ impl MusicSource for MusicSourceWrapper {
     fn set_event_dispatcher(&mut self, dispatcher: Arc<EventDispatcher>) {
         match self {
             MusicSourceWrapper::Local(source) => source.set_event_dispatcher(dispatcher),
+        }
+    }
+
+    fn set_volume(&mut self, volume: f32) {
+        match self {
+            MusicSourceWrapper::Local(source) => source.set_volume(volume),
         }
     }
 }
