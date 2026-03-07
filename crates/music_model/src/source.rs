@@ -191,10 +191,485 @@ impl MusicSource for LocalSource {
     }
 
     fn get_source_type(&self) -> SourceType {
-        SourceType::Local
+        // Use mount_point as the NAS identifier
+        // For now, we'll use a default since mount_point is a PathBuf
+        // TODO: Store actual mount point path when configuring NAS
+        SourceType::Nas { mount_point: None }
     }
 
     fn authenticate(&mut self, _credentials: Option<&Credentials>) -> Result<()> {
+        Ok(())
+    }
+
+    fn cleanup(&mut self) {
+        self.stop().ok();
+        self.dispatcher.take();
+    }
+
+    fn supports_streaming(&self) -> bool {
+        false
+    }
+
+    fn set_event_dispatcher(&mut self, dispatcher: Arc<crate::events::EventDispatcher>) {
+        self.dispatcher = Some(dispatcher);
+    }
+
+    fn set_volume(&mut self, volume: f32) {
+        if let Some(sink) = &self.rodio_sink {
+            sink.lock().set_volume(volume);
+        }
+    }
+}
+
+/// QQ Music source
+pub struct QqMusicSource {
+    state: PlaybackState,
+    position: Duration,
+    duration: Option<Duration>,
+    dispatcher: Option<Arc<crate::events::EventDispatcher>>,
+    credentials: Option<Credentials>,
+}
+
+impl QqMusicSource {
+    pub fn new() -> Self {
+        Self {
+            state: PlaybackState::Stopped,
+            position: Duration::default(),
+            duration: None,
+            dispatcher: None,
+            credentials: None,
+        }
+    }
+
+    fn dispatch_event(&self, event: MusicEvent) {
+        if let Some(dispatcher) = &self.dispatcher {
+            dispatcher.dispatch(event);
+        }
+    }
+}
+
+impl Default for QqMusicSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl MusicSource for QqMusicSource {
+    fn load(&mut self, _track: &Track) -> Result<()> {
+        self.state = PlaybackState::Loading;
+        self.dispatch_event(MusicEvent::StateChanged(
+            PlaybackState::Loading,
+            Some(PlaybackState::Stopped),
+        ));
+
+        // TODO: Implement QQ Music API integration
+        // For now, return an error indicating this is not yet implemented
+        Err(crate::error::MusicError::PlaybackFailed(
+            "QQ Music API integration not yet implemented".to_string(),
+        ))
+    }
+
+    fn play(&mut self) -> Result<()> {
+        Ok(())
+    }
+
+    fn pause(&mut self) -> Result<()> {
+        self.state = PlaybackState::Paused;
+        Ok(())
+    }
+
+    fn resume(&mut self) -> Result<()> {
+        self.state = PlaybackState::Playing;
+        Ok(())
+    }
+
+    fn stop(&mut self) -> Result<()> {
+        self.state = PlaybackState::Stopped;
+        Ok(())
+    }
+
+    fn seek(&mut self, _position: Duration) -> Result<()> {
+        Err(crate::error::MusicError::PlaybackFailed(
+            "Seeking not yet implemented for QQ Music".to_string(),
+        ))
+    }
+
+    fn get_position(&self) -> Duration {
+        self.position
+    }
+
+    fn get_duration(&self) -> Option<Duration> {
+        self.duration
+    }
+
+    fn get_state(&self) -> PlaybackState {
+        self.state
+    }
+
+    fn get_cover_art(&self, _track: &Track) -> Option<Vec<u8>> {
+        None
+    }
+
+    fn search(&self, _query: &str) -> Result<Vec<Track>> {
+        // TODO: Implement QQ Music search API
+        Ok(Vec::new())
+    }
+
+    fn get_source_type(&self) -> SourceType {
+        SourceType::QqMusic
+    }
+
+    fn authenticate(&mut self, credentials: Option<&Credentials>) -> Result<()> {
+        // TODO: Implement QQ Music authentication
+        self.credentials = credentials.cloned();
+        Ok(())
+    }
+
+    fn cleanup(&mut self) {
+        self.dispatcher.take();
+    }
+
+    fn supports_streaming(&self) -> bool {
+        true
+    }
+
+    fn set_event_dispatcher(&mut self, dispatcher: Arc<crate::events::EventDispatcher>) {
+        self.dispatcher = Some(dispatcher);
+    }
+
+    fn set_volume(&mut self, _volume: f32) {
+        // TODO: Implement volume control for QQ Music streams
+    }
+}
+
+/// NetEase Cloud Music source
+pub struct NetEaseMusicSource {
+    state: PlaybackState,
+    position: Duration,
+    duration: Option<Duration>,
+    dispatcher: Option<Arc<crate::events::EventDispatcher>>,
+    credentials: Option<Credentials>,
+}
+
+impl NetEaseMusicSource {
+    pub fn new() -> Self {
+        Self {
+            state: PlaybackState::Stopped,
+            position: Duration::default(),
+            duration: None,
+            dispatcher: None,
+            credentials: None,
+        }
+    }
+
+    fn dispatch_event(&self, event: MusicEvent) {
+        if let Some(dispatcher) = &self.dispatcher {
+            dispatcher.dispatch(event);
+        }
+    }
+}
+
+impl Default for NetEaseMusicSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl MusicSource for NetEaseMusicSource {
+    fn load(&mut self, _track: &Track) -> Result<()> {
+        self.state = PlaybackState::Loading;
+        self.dispatch_event(MusicEvent::StateChanged(
+            PlaybackState::Loading,
+            Some(PlaybackState::Stopped),
+        ));
+
+        // TODO: Implement NetEase Music API integration
+        // For now, return an error indicating this is not yet implemented
+        Err(crate::error::MusicError::PlaybackFailed(
+            "NetEase Music API integration not yet implemented".to_string(),
+        ))
+    }
+
+    fn play(&mut self) -> Result<()> {
+        Ok(())
+    }
+
+    fn pause(&mut self) -> Result<()> {
+        self.state = PlaybackState::Paused;
+        Ok(())
+    }
+
+    fn resume(&mut self) -> Result<()> {
+        self.state = PlaybackState::Playing;
+        Ok(())
+    }
+
+    fn stop(&mut self) -> Result<()> {
+        self.state = PlaybackState::Stopped;
+        Ok(())
+    }
+
+    fn seek(&mut self, _position: Duration) -> Result<()> {
+        Err(crate::error::MusicError::PlaybackFailed(
+            "Seeking not yet implemented for NetEase Music".to_string(),
+        ))
+    }
+
+    fn get_position(&self) -> Duration {
+        self.position
+    }
+
+    fn get_duration(&self) -> Option<Duration> {
+        self.duration
+    }
+
+    fn get_state(&self) -> PlaybackState {
+        self.state
+    }
+
+    fn get_cover_art(&self, _track: &Track) -> Option<Vec<u8>> {
+        None
+    }
+
+    fn search(&self, _query: &str) -> Result<Vec<Track>> {
+        // TODO: Implement NetEase Music search API
+        Ok(Vec::new())
+    }
+
+    fn get_source_type(&self) -> SourceType {
+        SourceType::NetEaseMusic
+    }
+
+    fn authenticate(&mut self, credentials: Option<&Credentials>) -> Result<()> {
+        // TODO: Implement NetEase Music authentication
+        self.credentials = credentials.cloned();
+        Ok(())
+    }
+
+    fn cleanup(&mut self) {
+        self.dispatcher.take();
+    }
+
+    fn supports_streaming(&self) -> bool {
+        true
+    }
+
+    fn set_event_dispatcher(&mut self, dispatcher: Arc<crate::events::EventDispatcher>) {
+        self.dispatcher = Some(dispatcher);
+    }
+
+    fn set_volume(&mut self, _volume: f32) {
+        // TODO: Implement volume control for NetEase Music streams
+    }
+}
+
+/// NAS network source
+///
+/// Supports:
+/// - SMB2/3 protocol via `smb` crate (feature: nas-smb)
+/// - WebDAV protocol via `reqwest_dav` or `webdav-request` (feature: nas-webdav)
+///
+/// Implementation requires adding optional dependencies to Cargo.toml:
+/// ```toml
+/// [dependencies]
+/// reqwest = { version = "0.12", optional = true }
+/// smb = { version = "0.4", optional = true }
+///
+/// [features]
+/// nas-webdav = ["reqwest"]
+/// nas-smb = ["smb"]
+/// ```
+pub struct NasSource {
+    state: PlaybackState,
+    position: Duration,
+    duration: Option<Duration>,
+    dispatcher: Option<Arc<crate::events::EventDispatcher>>,
+    credentials: Option<Credentials>,
+    nas_config: Option<NasConfig>,
+    rodio_sink: Option<Arc<Mutex<rodio::Sink>>>,
+    _stream: Option<rodio::OutputStream>,
+    stream_handle: Option<rodio::OutputStreamHandle>,
+}
+
+/// NAS configuration
+#[derive(Debug, Clone)]
+pub struct NasConfig {
+    pub address: String,
+    pub protocol: NasProtocol,
+    pub share_path: String,
+    pub username: Option<String>,
+    pub password: Option<String>,
+}
+
+/// NAS protocol types
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NasProtocol {
+    Smb,
+    WebDav,
+}
+
+impl NasSource {
+    pub fn new() -> Self {
+        Self {
+            state: PlaybackState::Stopped,
+            position: Duration::default(),
+            duration: None,
+            dispatcher: None,
+            credentials: None,
+            nas_config: None,
+            rodio_sink: None,
+            _stream: None,
+            stream_handle: None,
+        }
+    }
+
+    pub fn with_config(config: NasConfig) -> Self {
+        Self {
+            nas_config: Some(config),
+            ..Self::new()
+        }
+    }
+
+    fn initialize_audio_output(&mut self) -> Result<()> {
+        if self.stream_handle.is_none() {
+            let (stream, handle) = rodio::OutputStream::try_default()
+                .map_err(|e| crate::error::MusicError::PlaybackFailed(e.to_string()))?;
+            self._stream = Some(stream);
+            self.stream_handle = Some(handle);
+        }
+        Ok(())
+    }
+
+    fn dispatch_event(&self, event: MusicEvent) {
+        if let Some(dispatcher) = &self.dispatcher {
+            dispatcher.dispatch(event);
+        }
+    }
+}
+
+impl Default for NasSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl MusicSource for NasSource {
+    fn load(&mut self, track: &Track) -> Result<()> {
+        self.state = PlaybackState::Loading;
+        self.dispatch_event(MusicEvent::StateChanged(
+            PlaybackState::Loading,
+            Some(PlaybackState::Stopped),
+        ));
+
+        // TODO: Implement NAS SMB/WebDAV client integration
+        // For now, treat as local file if path is absolute
+        if track.path.is_absolute() && std::path::Path::new(&track.path).exists() {
+            self.initialize_audio_output()?;
+
+            let file = std::fs::File::open(&track.path)?;
+            let handle = self.stream_handle.as_ref().ok_or_else(|| {
+                crate::error::MusicError::Io("No audio output handle".to_string())
+            })?;
+
+            let source = rodio::Decoder::new(std::io::BufReader::new(file))
+                .map_err(|e| crate::error::MusicError::PlaybackFailed(e.to_string()))?;
+            let sink = rodio::Sink::try_new(handle)
+                .map_err(|e| crate::error::MusicError::PlaybackFailed(e.to_string()))?;
+
+            sink.append(source);
+            sink.pause();
+
+            self.rodio_sink = Some(Arc::new(Mutex::new(sink)));
+            self.state = PlaybackState::Stopped;
+            self.position = Duration::default();
+            self.duration = track.duration;
+
+            self.dispatch_event(MusicEvent::TrackChanged(track.clone()));
+
+            Ok(())
+        } else {
+            Err(crate::error::MusicError::PlaybackFailed(
+                "NAS SMB/WebDAV integration not yet implemented - only local absolute paths are supported".to_string(),
+            ))
+        }
+    }
+
+    fn play(&mut self) -> Result<()> {
+        if let Some(sink) = &self.rodio_sink {
+            sink.lock().play();
+            self.state = PlaybackState::Playing;
+            self.dispatch_event(MusicEvent::StateChanged(
+                PlaybackState::Playing,
+                Some(PlaybackState::Paused),
+            ));
+        }
+        Ok(())
+    }
+
+    fn pause(&mut self) -> Result<()> {
+        if let Some(sink) = &self.rodio_sink {
+            sink.lock().pause();
+            self.state = PlaybackState::Paused;
+            self.dispatch_event(MusicEvent::StateChanged(
+                PlaybackState::Paused,
+                Some(PlaybackState::Playing),
+            ));
+        }
+        Ok(())
+    }
+
+    fn resume(&mut self) -> Result<()> {
+        self.play()
+    }
+
+    fn stop(&mut self) -> Result<()> {
+        if let Some(sink) = &self.rodio_sink {
+            sink.lock().stop();
+        }
+        self.rodio_sink = None;
+        self.state = PlaybackState::Stopped;
+        self.position = Duration::default();
+        self.dispatch_event(MusicEvent::StateChanged(
+            PlaybackState::Stopped,
+            Some(PlaybackState::Playing),
+        ));
+        Ok(())
+    }
+
+    fn seek(&mut self, _position: Duration) -> Result<()> {
+        Err(crate::error::MusicError::PlaybackFailed(
+            "Seeking not supported for NAS files".to_string(),
+        ))
+    }
+
+    fn get_position(&self) -> Duration {
+        self.position
+    }
+
+    fn get_duration(&self) -> Option<Duration> {
+        self.duration
+    }
+
+    fn get_state(&self) -> PlaybackState {
+        self.state
+    }
+
+    fn get_cover_art(&self, _track: &Track) -> Option<Vec<u8>> {
+        None
+    }
+
+    fn search(&self, _query: &str) -> Result<Vec<Track>> {
+        // TODO: Implement NAS file search via SMB/WebDAV
+        Ok(Vec::new())
+    }
+
+    fn get_source_type(&self) -> SourceType {
+        SourceType::Nas { mount_point: None }
+    }
+
+    fn authenticate(&mut self, credentials: Option<&Credentials>) -> Result<()> {
+        // TODO: Implement NAS authentication (SMB/WebDAV)
+        self.credentials = credentials.cloned();
         Ok(())
     }
 

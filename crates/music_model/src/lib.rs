@@ -21,5 +21,8 @@ pub use error::{MusicError, Result};
 pub use events::{EventDispatcher, MusicEvent, MusicEventListener};
 pub use progress::ProgressTracker;
 pub use queue::PlayQueue;
-pub use source::{Credentials, LocalSource, MusicSource};
+pub use source::{
+    Credentials, LocalSource, MusicSource, NasConfig, NasProtocol, NasSource, NetEaseMusicSource,
+    QqMusicSource,
+};
 pub use types::{PlaybackMode, PlaybackState, SourceType, Track};

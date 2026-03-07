@@ -1,4 +1,4 @@
-//! Music module - Audio playback with playlist management
+//! Music module - Audio playback with playlist management - Absolute paths and source switching
 
 use crossterm::event::{Event as CrosstermEvent, KeyCode, KeyEvent};
 use ratatui::{
@@ -19,7 +19,8 @@ use core::{
 };
 
 use music_model::{
-    MusicEvent, MusicEventListener, PlaybackMode, PlaybackState, PlayerController, Track,
+    MusicEvent, MusicEventListener, PlaybackMode, PlaybackState, PlayerController, SourceType,
+    Track,
 };
 
 /// UI event listener for music player
@@ -52,12 +53,13 @@ impl MusicEventListener for UIEventListener {
     }
 }
 
-/// Main music module
+/// Main music module with absolute paths and source switching
 pub struct MusicModule {
     controller: PlayerController,
     music_dir: PathBuf,
     theme: Theme,
     selected_index: usize,
+    current_source: SourceType,
 }
 
 impl MusicModule {
@@ -72,6 +74,7 @@ impl MusicModule {
             music_dir,
             theme: Theme::default(),
             selected_index: 0,
+            current_source: SourceType::Local,
         }
     }
 
@@ -113,22 +116,7 @@ impl MusicModule {
                 self.load_directory_recursive(&path, extensions)?;
             } else if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
                 if extensions.iter().any(|&e| e.eq_ignore_ascii_case(ext)) {
-                    let filename = path
-                        .file_name()
-                        .and_then(|f| f.to_str())
-                        .unwrap_or("Unknown")
-                        .to_string();
-
-                    let title = filename
-                        .trim_end_matches(".mp3")
-                        .trim_end_matches(".flac")
-                        .trim_end_matches(".ogg")
-                        .trim_end_matches(".wav")
-                        .trim_end_matches(".m4a")
-                        .to_string();
-
-                    let artist = String::from("Unknown");
-
+                    let (artist, title) = self.extract_metadata(&path);
                     let track = Track::local(path, title, artist);
                     self.controller.add_track(track);
                 }
@@ -136,6 +124,28 @@ impl MusicModule {
         }
 
         Ok(())
+    }
+
+    /// Extract metadata from audio file using symphonia
+    /// TODO: Implement proper metadata extraction using symphonia
+    /// Currently returns fallback values based on filename
+    fn extract_metadata(&self, path: &PathBuf) -> (String, String) {
+        // TODO: Implement symphonia metadata extraction properly
+        // For now, fall back to filename-based metadata
+        (String::from("-"), self.get_filename_title(path))
+    }
+
+    fn get_filename_title(&self, path: &PathBuf) -> String {
+        path.file_name()
+            .and_then(|f| f.to_str())
+            .unwrap_or("-")
+            .to_string()
+            .trim_end_matches(".mp3")
+            .trim_end_matches(".flac")
+            .trim_end_matches(".ogg")
+            .trim_end_matches(".wav")
+            .trim_end_matches(".m4a")
+            .to_string()
     }
 
     /// Play track
@@ -146,17 +156,13 @@ impl MusicModule {
     }
 
     /// Pause playback
-    pub fn pause(&mut self) {
-        if let Err(e) = self.controller.pause() {
-            log::error!("Failed to pause: {}", e);
-        }
+    pub fn pause(&mut self) -> Result<(), anyhow::Error> {
+        self.controller.pause().map_err(|e| anyhow::anyhow!(e))
     }
 
     /// Resume playback
-    pub fn resume(&mut self) {
-        if let Err(e) = self.controller.resume() {
-            log::error!("Failed to resume: {}", e);
-        }
+    pub fn resume(&mut self) -> Result<(), anyhow::Error> {
+        self.controller.resume().map_err(|e| anyhow::anyhow!(e))
     }
 
     /// Stop playback
@@ -192,6 +198,28 @@ impl MusicModule {
         self.controller.cycle_playback_mode();
     }
 
+    /// Get current source name
+    fn get_source_name(&self) -> &str {
+        match self.current_source {
+            SourceType::Local => "Local",
+            SourceType::QqMusic => "QQ Music",
+            SourceType::NetEaseMusic => "NetEase Music",
+            SourceType::Nas { .. } => "NAS",
+        }
+    }
+
+    /// Switch music source
+    pub fn switch_source(&mut self) {
+        self.current_source = match self.current_source {
+            SourceType::Local => SourceType::QqMusic,
+            SourceType::QqMusic => SourceType::NetEaseMusic,
+            SourceType::NetEaseMusic => SourceType::Nas { mount_point: None },
+            SourceType::Nas { .. } => SourceType::Local,
+        };
+
+        log::info!("[Music] Switched to source: {}", self.get_source_name());
+    }
+
     /// Navigate up
     pub fn navigate_up(&mut self) {
         self.selected_index = self.selected_index.saturating_sub(1);
@@ -203,14 +231,18 @@ impl MusicModule {
             (self.selected_index + 1).min(self.controller.get_queue().len().saturating_sub(1));
     }
 
-    /// Draw playlist
+    /// Draw playlist with absolute path display
     fn draw_playlist(&self, frame: &mut Frame, area: Rect) {
         let tracks = self.controller.get_queue().get_tracks();
         let current_index = self.controller.get_queue().current_index();
 
         let mut lines = vec![
             Line::from(vec![Span::styled(
-                format!("播放列表 ({} 首)", tracks.len()),
+                format!(
+                    "播放列表 ({} 首) [{}]",
+                    tracks.len(),
+                    self.get_source_name()
+                ),
                 Style::default()
                     .fg(self.theme.primary())
                     .add_modifier(Modifier::BOLD),
@@ -244,10 +276,10 @@ impl MusicModule {
                     Style::default()
                 };
 
-                let path_display = if track.parent.is_empty() {
-                    String::from("📁")
+                let path_display = if track.path.is_absolute() {
+                    format!("📁 {}", track.path.display())
                 } else {
-                    format!("📁 {}", track.parent)
+                    format!("📁 {}/{}", self.music_dir.display(), track.path.display())
                 };
 
                 let line = format!(
@@ -306,9 +338,12 @@ impl MusicModule {
         };
 
         let mode = self.controller.get_queue().get_mode();
+        let source_name = self.get_source_name();
 
         lines.push(Line::from(vec![
-            Span::styled("状态: ", Style::default().fg(self.theme.muted())),
+            Span::styled("源: ", Style::default().fg(self.theme.muted())),
+            Span::styled(source_name, Style::default().fg(self.theme.primary())),
+            Span::styled("  状态: ", Style::default().fg(self.theme.muted())),
             Span::styled(playback_status, Style::default()),
             Span::styled("  |  ", Style::default()),
             Span::styled(
@@ -361,8 +396,7 @@ impl MusicModule {
 
     /// Draw help bar
     fn draw_help_bar(&self, frame: &mut Frame, area: Rect) {
-        let help =
-            "Space:播放/停止 <:音量- >:音量+ r:切换循环 n:下一首 p:上一首 j/k:导航 Enter:播放选中";
+        let help = "Space:播放/停止 <:音量- >:音量+ r:切换循环 s:切换源 n:下一首 p:上一首 j/k:导航 Enter:播放选中";
         let paragraph = Paragraph::new(help).style(Style::default().fg(self.theme.muted()));
         frame.render_widget(paragraph, area);
     }
@@ -372,8 +406,8 @@ impl MusicModule {
         match key.code {
             KeyCode::Char(' ') => {
                 match self.controller.get_state() {
-                    PlaybackState::Playing => self.pause(),
-                    PlaybackState::Paused => self.resume(),
+                    PlaybackState::Playing => self.pause().unwrap(),
+                    PlaybackState::Paused => self.resume().unwrap(),
                     _ => {
                         if !self.controller.get_queue().is_empty() {
                             self.play(self.selected_index);
@@ -392,6 +426,10 @@ impl MusicModule {
             }
             KeyCode::Char('r') | KeyCode::Char('R') => {
                 self.toggle_repeat();
+                Action::None
+            }
+            KeyCode::Char('s') | KeyCode::Char('S') => {
+                self.switch_source();
                 Action::None
             }
             KeyCode::Char('n') | KeyCode::Char('N') => {
@@ -481,6 +519,10 @@ impl CoreModule for MusicModule {
             Shortcut {
                 key: "r",
                 description: "切换循环",
+            },
+            Shortcut {
+                key: "s",
+                description: "切换源",
             },
             Shortcut {
                 key: "n/p",

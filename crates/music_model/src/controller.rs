@@ -240,12 +240,18 @@ impl Default for PlayerController {
 
 pub enum MusicSourceWrapper {
     Local(Box<LocalSource>),
+    QqMusic(Box<crate::source::QqMusicSource>),
+    NetEaseMusic(Box<crate::source::NetEaseMusicSource>),
+    Nas(Box<crate::source::NasSource>),
 }
 
 impl MusicSourceWrapper {
     fn as_mut_source(&mut self) -> &mut dyn MusicSource {
         match self {
             MusicSourceWrapper::Local(source) => source.as_mut(),
+            MusicSourceWrapper::QqMusic(source) => source.as_mut(),
+            MusicSourceWrapper::NetEaseMusic(source) => source.as_mut(),
+            MusicSourceWrapper::Nas(source) => source.as_mut(),
         }
     }
 }
@@ -278,66 +284,99 @@ impl MusicSource for MusicSourceWrapper {
     fn get_position(&self) -> Duration {
         match self {
             MusicSourceWrapper::Local(source) => source.get_position(),
+            MusicSourceWrapper::QqMusic(source) => source.get_position(),
+            MusicSourceWrapper::NetEaseMusic(source) => source.get_position(),
+            MusicSourceWrapper::Nas(source) => source.get_position(),
         }
     }
 
     fn get_duration(&self) -> Option<Duration> {
         match self {
             MusicSourceWrapper::Local(source) => source.get_duration(),
+            MusicSourceWrapper::QqMusic(source) => source.get_duration(),
+            MusicSourceWrapper::NetEaseMusic(source) => source.get_duration(),
+            MusicSourceWrapper::Nas(source) => source.get_duration(),
         }
     }
 
     fn get_state(&self) -> PlaybackState {
         match self {
             MusicSourceWrapper::Local(source) => source.get_state(),
+            MusicSourceWrapper::QqMusic(source) => source.get_state(),
+            MusicSourceWrapper::NetEaseMusic(source) => source.get_state(),
+            MusicSourceWrapper::Nas(source) => source.get_state(),
         }
     }
 
     fn get_cover_art(&self, track: &Track) -> Option<Vec<u8>> {
         match self {
             MusicSourceWrapper::Local(source) => source.get_cover_art(track),
+            MusicSourceWrapper::QqMusic(source) => source.get_cover_art(track),
+            MusicSourceWrapper::NetEaseMusic(source) => source.get_cover_art(track),
+            MusicSourceWrapper::Nas(source) => source.get_cover_art(track),
         }
     }
 
     fn search(&self, query: &str) -> Result<Vec<Track>> {
         match self {
             MusicSourceWrapper::Local(source) => source.search(query),
+            MusicSourceWrapper::QqMusic(source) => source.search(query),
+            MusicSourceWrapper::NetEaseMusic(source) => source.search(query),
+            MusicSourceWrapper::Nas(source) => source.search(query),
         }
     }
 
     fn get_source_type(&self) -> SourceType {
         match self {
             MusicSourceWrapper::Local(source) => source.get_source_type(),
+            MusicSourceWrapper::QqMusic(source) => source.get_source_type(),
+            MusicSourceWrapper::NetEaseMusic(source) => source.get_source_type(),
+            MusicSourceWrapper::Nas(source) => source.get_source_type(),
         }
     }
 
     fn authenticate(&mut self, credentials: Option<&Credentials>) -> Result<()> {
         match self {
             MusicSourceWrapper::Local(source) => source.authenticate(credentials),
+            MusicSourceWrapper::QqMusic(source) => source.authenticate(credentials),
+            MusicSourceWrapper::NetEaseMusic(source) => source.authenticate(credentials),
+            MusicSourceWrapper::Nas(source) => source.authenticate(credentials),
         }
     }
 
     fn cleanup(&mut self) {
         match self {
             MusicSourceWrapper::Local(source) => source.cleanup(),
+            MusicSourceWrapper::QqMusic(source) => source.cleanup(),
+            MusicSourceWrapper::NetEaseMusic(source) => source.cleanup(),
+            MusicSourceWrapper::Nas(source) => source.cleanup(),
         }
     }
 
     fn supports_streaming(&self) -> bool {
         match self {
             MusicSourceWrapper::Local(source) => source.supports_streaming(),
+            MusicSourceWrapper::QqMusic(source) => source.supports_streaming(),
+            MusicSourceWrapper::NetEaseMusic(source) => source.supports_streaming(),
+            MusicSourceWrapper::Nas(source) => source.supports_streaming(),
         }
     }
 
     fn set_event_dispatcher(&mut self, dispatcher: Arc<EventDispatcher>) {
         match self {
             MusicSourceWrapper::Local(source) => source.set_event_dispatcher(dispatcher),
+            MusicSourceWrapper::QqMusic(source) => source.set_event_dispatcher(dispatcher),
+            MusicSourceWrapper::NetEaseMusic(source) => source.set_event_dispatcher(dispatcher),
+            MusicSourceWrapper::Nas(source) => source.set_event_dispatcher(dispatcher),
         }
     }
 
     fn set_volume(&mut self, volume: f32) {
         match self {
             MusicSourceWrapper::Local(source) => source.set_volume(volume),
+            MusicSourceWrapper::QqMusic(source) => source.set_volume(volume),
+            MusicSourceWrapper::NetEaseMusic(source) => source.set_volume(volume),
+            MusicSourceWrapper::Nas(source) => source.set_volume(volume),
         }
     }
 }
