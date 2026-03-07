@@ -307,6 +307,118 @@ impl MusicModule {
     }
 
     /// Draw player controls
+    /// Draw lyrics panel
+    fn draw_lyrics(&self, frame: &mut Frame, area: Rect) {
+        let current_track = self.controller.get_current_track();
+
+        if current_track.is_none() {
+            let paragraph = Paragraph::new(Text::from(vec![
+                Line::from(vec![Span::styled(
+                    "歌词",
+                    Style::default().fg(self.theme.muted()),
+                )]),
+                Line::default(),
+                Line::from("没有正在播放的歌曲"),
+            ]))
+            .block(Block::default().borders(Borders::ALL))
+            .wrap(Wrap { trim: true });
+
+            frame.render_widget(paragraph, area);
+            return;
+        }
+
+        let track = current_track.unwrap();
+
+        if let Some(lrc_text) = &track.lyrics {
+            use music_model::{LrcParser, Lyrics};
+
+            match LrcParser::parse(lrc_text) {
+                Ok(lyrics) => {
+                    let position = self.controller.get_position();
+                    let current_index = lyrics.find_current_line(position);
+
+                    let visible_count = area.height.saturating_sub(2) as usize;
+                    let start_index = if let Some(idx) = current_index {
+                        idx.saturating_sub(visible_count / 2)
+                    } else {
+                        0
+                    };
+                    let end_index = (start_index + visible_count).min(lyrics.lines.len());
+
+                    let mut lines = vec![
+                        Line::from(vec![Span::styled(
+                            format!("歌词 - {} [{}]", track.title, track.artist),
+                            Style::default()
+                                .fg(self.theme.primary())
+                                .add_modifier(Modifier::BOLD),
+                        )]),
+                        Line::default(),
+                    ];
+
+                    for i in start_index..end_index {
+                        if let Some(line) = lyrics.get_line(i) {
+                            let is_current = current_index == Some(i);
+                            let style = if is_current {
+                                Style::default()
+                                    .fg(Color::Cyan)
+                                    .add_modifier(Modifier::BOLD)
+                            } else {
+                                Style::default().fg(self.theme.muted())
+                            };
+
+                            lines.push(Line::from(vec![Span::styled(&line.text, style)]));
+                        }
+                    }
+
+                    if lyrics.lines.is_empty() {
+                        lines.push(Line::from("暂无歌词"));
+                    }
+
+                    let paragraph = Paragraph::new(Text::from(lines))
+                        .block(Block::default().borders(Borders::ALL))
+                        .wrap(Wrap { trim: true });
+
+                    frame.render_widget(paragraph, area);
+                }
+                Err(_) => {
+                    let paragraph = Paragraph::new(Text::from(vec![
+                        Line::from(vec![Span::styled(
+                            "歌词",
+                            Style::default().fg(self.theme.muted()),
+                        )]),
+                        Line::default(),
+                        Line::from("歌词解析失败"),
+                        Line::default(),
+                        Line::from("LRC格式: [MM:SS.ms] 歌词文本"),
+                        Line::from("示例: [00:00.00] First line"),
+                    ]))
+                    .block(Block::default().borders(Borders::ALL))
+                    .wrap(Wrap { trim: true });
+
+                    frame.render_widget(paragraph, area);
+                }
+            }
+        } else {
+            let paragraph = Paragraph::new(Text::from(vec![
+                Line::from(vec![Span::styled(
+                    format!("歌词 - {} [{}]", track.title, track.artist),
+                    Style::default()
+                        .fg(self.theme.primary())
+                        .add_modifier(Modifier::BOLD),
+                )]),
+                Line::default(),
+                Line::from("暂无歌词"),
+                Line::default(),
+                Line::from("NetEase Music: 播放时自动获取歌词"),
+                Line::from("Local: 支持内嵌歌词文件"),
+            ]))
+            .block(Block::default().borders(Borders::ALL))
+            .wrap(Wrap { trim: true });
+
+            frame.render_widget(paragraph, area);
+        }
+    }
+
     fn draw_player(&self, frame: &mut Frame, area: Rect) {
         let mut lines = vec![];
 
@@ -480,21 +592,22 @@ impl CoreModule for MusicModule {
     }
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) {
-        let layout = Layout::default()
+        let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(5), // Player
-                Constraint::Min(5),    // Playlist
-                Constraint::Length(1), // Volume
-                Constraint::Length(1), // Help
+                Constraint::Length(3),
+                Constraint::Min(8),
+                Constraint::Min(10),
+                Constraint::Length(3),
             ])
             .split(area);
 
-        self.controller.update();
-        self.draw_player(frame, layout[0]);
-        self.draw_playlist(frame, layout[1]);
-        self.draw_volume(frame, layout[2]);
-        self.draw_help_bar(frame, layout[3]);
+        let current_track = self.controller.get_current_track();
+
+        self.draw_player(frame, chunks[0]);
+        self.draw_lyrics(frame, chunks[1]);
+        self.draw_playlist(frame, chunks[2]);
+        self.draw_help_bar(frame, chunks[3]);
     }
 
     fn save(&self) -> anyhow::Result<()> {

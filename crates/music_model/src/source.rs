@@ -216,7 +216,7 @@ impl MusicSource for LocalSource {
 
     fn set_volume(&mut self, volume: f32) {
         if let Some(sink) = &self.rodio_sink {
-            sink.lock().set_volume(volume);
+            let _ = sink.lock().set_volume(volume);
         }
     }
 }
@@ -228,6 +228,11 @@ pub struct QqMusicSource {
     duration: Option<Duration>,
     dispatcher: Option<Arc<crate::events::EventDispatcher>>,
     credentials: Option<Credentials>,
+    api_base_url: String,
+    current_audio_url: Option<String>,
+    rodio_sink: Option<Arc<Mutex<rodio::Sink>>>,
+    _stream: Option<rodio::OutputStream>,
+    stream_handle: Option<rodio::OutputStreamHandle>,
 }
 
 impl QqMusicSource {
@@ -238,6 +243,11 @@ impl QqMusicSource {
             duration: None,
             dispatcher: None,
             credentials: None,
+            api_base_url: "https://y.qq.com/api".to_string(),
+            current_audio_url: None,
+            rodio_sink: None,
+            _stream: None,
+            stream_handle: None,
         }
     }
 
@@ -270,27 +280,51 @@ impl MusicSource for QqMusicSource {
     }
 
     fn play(&mut self) -> Result<()> {
+        if let Some(sink) = &self.rodio_sink {
+            sink.lock().play();
+            self.state = PlaybackState::Playing;
+            self.dispatch_event(MusicEvent::StateChanged(
+                PlaybackState::Playing,
+                Some(PlaybackState::Paused),
+            ));
+        }
         Ok(())
     }
 
     fn pause(&mut self) -> Result<()> {
-        self.state = PlaybackState::Paused;
+        if let Some(sink) = &self.rodio_sink {
+            sink.lock().pause();
+            self.state = PlaybackState::Paused;
+            self.dispatch_event(MusicEvent::StateChanged(
+                PlaybackState::Paused,
+                Some(PlaybackState::Playing),
+            ));
+        }
         Ok(())
     }
 
     fn resume(&mut self) -> Result<()> {
-        self.state = PlaybackState::Playing;
-        Ok(())
+        self.play()
     }
 
     fn stop(&mut self) -> Result<()> {
+        if let Some(sink) = &self.rodio_sink {
+            sink.lock().stop();
+        }
+        self.rodio_sink = None;
+        self.current_audio_url = None;
         self.state = PlaybackState::Stopped;
+        self.position = Duration::default();
+        self.dispatch_event(MusicEvent::StateChanged(
+            PlaybackState::Stopped,
+            Some(PlaybackState::Playing),
+        ));
         Ok(())
     }
 
     fn seek(&mut self, _position: Duration) -> Result<()> {
         Err(crate::error::MusicError::PlaybackFailed(
-            "Seeking not yet implemented for QQ Music".to_string(),
+            "Seeking not supported for streamed audio".to_string(),
         ))
     }
 
@@ -320,12 +354,12 @@ impl MusicSource for QqMusicSource {
     }
 
     fn authenticate(&mut self, credentials: Option<&Credentials>) -> Result<()> {
-        // TODO: Implement QQ Music authentication
         self.credentials = credentials.cloned();
         Ok(())
     }
 
     fn cleanup(&mut self) {
+        self.stop().ok();
         self.dispatcher.take();
     }
 
@@ -337,10 +371,14 @@ impl MusicSource for QqMusicSource {
         self.dispatcher = Some(dispatcher);
     }
 
-    fn set_volume(&mut self, _volume: f32) {
-        // TODO: Implement volume control for QQ Music streams
+    fn set_volume(&mut self, volume: f32) {
+        if let Some(sink) = &self.rodio_sink {
+            let _ = sink.lock().set_volume(volume);
+        }
     }
 }
+
+/// NetEase Cloud Music source
 
 /// NetEase Cloud Music source
 pub struct NetEaseMusicSource {
@@ -349,6 +387,11 @@ pub struct NetEaseMusicSource {
     duration: Option<Duration>,
     dispatcher: Option<Arc<crate::events::EventDispatcher>>,
     credentials: Option<Credentials>,
+    api_base_url: String,
+    current_audio_url: Option<String>,
+    rodio_sink: Option<Arc<Mutex<rodio::Sink>>>,
+    _stream: Option<rodio::OutputStream>,
+    stream_handle: Option<rodio::OutputStreamHandle>,
 }
 
 impl NetEaseMusicSource {
@@ -359,13 +402,69 @@ impl NetEaseMusicSource {
             duration: None,
             dispatcher: None,
             credentials: None,
+            api_base_url: "https://music.163.com/api".to_string(),
+            current_audio_url: None,
+            rodio_sink: None,
+            _stream: None,
+            stream_handle: None,
         }
+    }
+
+    pub fn with_api_base(mut self, url: String) -> Self {
+        self.api_base_url = url;
+        self
+    }
+
+    fn initialize_audio_output(&mut self) -> Result<()> {
+        if self.stream_handle.is_none() {
+            let (stream, handle) = rodio::OutputStream::try_default()
+                .map_err(|e| crate::error::MusicError::PlaybackFailed(e.to_string()))?;
+            self._stream = Some(stream);
+            self.stream_handle = Some(handle);
+        }
+        Ok(())
     }
 
     fn dispatch_event(&self, event: MusicEvent) {
         if let Some(dispatcher) = &self.dispatcher {
             dispatcher.dispatch(event);
         }
+    }
+
+    fn fetch_audio_url_sync(&self, track_id: &str) -> Result<String> {
+        let url = format!("{}/song/url?id={}&br=320000", self.api_base_url, track_id);
+
+        let response = reqwest::blocking::get(&url).map_err(|e| {
+            crate::error::MusicError::PlaybackFailed(format!("HTTP request failed: {}", e))
+        })?;
+
+        let json: serde_json::Value = response.json().map_err(|e| {
+            crate::error::MusicError::PlaybackFailed(format!("JSON parse failed: {}", e))
+        })?;
+
+        Ok(json["data"][0]["url"]
+            .as_str()
+            .ok_or_else(|| {
+                crate::error::MusicError::PlaybackFailed("No audio URL found".to_string())
+            })?
+            .to_string())
+    }
+
+    fn fetch_lyrics_sync(&self, track_id: &str) -> Result<String> {
+        let url = format!("{}/lyric?id={}", self.api_base_url, track_id);
+
+        let response = reqwest::blocking::get(&url).map_err(|e| {
+            crate::error::MusicError::PlaybackFailed(format!("HTTP request failed: {}", e))
+        })?;
+
+        let json: serde_json::Value = response.json().map_err(|e| {
+            crate::error::MusicError::PlaybackFailed(format!("JSON parse failed: {}", e))
+        })?;
+
+        Ok(json["lrc"]["lyric"]
+            .as_str()
+            .ok_or_else(|| crate::error::MusicError::PlaybackFailed("No lyrics found".to_string()))?
+            .to_string())
     }
 }
 
@@ -376,42 +475,107 @@ impl Default for NetEaseMusicSource {
 }
 
 impl MusicSource for NetEaseMusicSource {
-    fn load(&mut self, _track: &Track) -> Result<()> {
+    fn load(&mut self, track: &Track) -> Result<()> {
         self.state = PlaybackState::Loading;
         self.dispatch_event(MusicEvent::StateChanged(
             PlaybackState::Loading,
             Some(PlaybackState::Stopped),
         ));
 
-        // TODO: Implement NetEase Music API integration
-        // For now, return an error indicating this is not yet implemented
-        Err(crate::error::MusicError::PlaybackFailed(
-            "NetEase Music API integration not yet implemented".to_string(),
-        ))
+        self.initialize_audio_output()?;
+
+        let track_id = track.id.clone();
+        let audio_url = self.fetch_audio_url_sync(&track_id)?;
+        self.current_audio_url = Some(audio_url.clone());
+
+        let lyrics_text = self.fetch_lyrics_sync(&track_id);
+
+        let handle = self
+            .stream_handle
+            .as_ref()
+            .ok_or_else(|| crate::error::MusicError::Io("No audio output handle".to_string()))?;
+
+        let response = reqwest::blocking::get(&audio_url).map_err(|e| {
+            crate::error::MusicError::PlaybackFailed(format!("HTTP request failed: {}", e))
+        })?;
+
+        let bytes = response
+            .bytes()
+            .map_err(|e| crate::error::MusicError::PlaybackFailed(e.to_string()))?;
+
+        let cursor = std::io::Cursor::new(bytes.to_vec());
+        let source = rodio::Decoder::new(std::io::BufReader::new(cursor)).map_err(
+            |e: rodio::decoder::DecoderError| {
+                crate::error::MusicError::PlaybackFailed(e.to_string())
+            },
+        )?;
+
+        let sink = rodio::Sink::try_new(handle)
+            .map_err(|e| crate::error::MusicError::PlaybackFailed(e.to_string()))?;
+
+        sink.append(source);
+        sink.pause();
+
+        self.rodio_sink = Some(Arc::new(Mutex::new(sink)));
+        self.state = PlaybackState::Stopped;
+        self.position = Duration::default();
+        self.duration = track.duration;
+
+        let mut track_with_lyrics = track.clone();
+        if let Ok(lyrics) = lyrics_text {
+            track_with_lyrics.lyrics = Some(lyrics);
+        }
+        self.dispatch_event(MusicEvent::TrackChanged(track_with_lyrics));
+
+        Ok(())
     }
 
     fn play(&mut self) -> Result<()> {
+        if let Some(sink) = &self.rodio_sink {
+            sink.lock().play();
+            self.state = PlaybackState::Playing;
+            self.dispatch_event(MusicEvent::StateChanged(
+                PlaybackState::Playing,
+                Some(PlaybackState::Paused),
+            ));
+        }
         Ok(())
     }
 
     fn pause(&mut self) -> Result<()> {
-        self.state = PlaybackState::Paused;
+        if let Some(sink) = &self.rodio_sink {
+            sink.lock().pause();
+            self.state = PlaybackState::Paused;
+            self.dispatch_event(MusicEvent::StateChanged(
+                PlaybackState::Paused,
+                Some(PlaybackState::Playing),
+            ));
+        }
         Ok(())
     }
 
     fn resume(&mut self) -> Result<()> {
-        self.state = PlaybackState::Playing;
-        Ok(())
+        self.play()
     }
 
     fn stop(&mut self) -> Result<()> {
+        if let Some(sink) = &self.rodio_sink {
+            sink.lock().stop();
+        }
+        self.rodio_sink = None;
+        self.current_audio_url = None;
         self.state = PlaybackState::Stopped;
+        self.position = Duration::default();
+        self.dispatch_event(MusicEvent::StateChanged(
+            PlaybackState::Stopped,
+            Some(PlaybackState::Playing),
+        ));
         Ok(())
     }
 
     fn seek(&mut self, _position: Duration) -> Result<()> {
         Err(crate::error::MusicError::PlaybackFailed(
-            "Seeking not yet implemented for NetEase Music".to_string(),
+            "Seeking not supported for streamed audio".to_string(),
         ))
     }
 
@@ -441,12 +605,12 @@ impl MusicSource for NetEaseMusicSource {
     }
 
     fn authenticate(&mut self, credentials: Option<&Credentials>) -> Result<()> {
-        // TODO: Implement NetEase Music authentication
         self.credentials = credentials.cloned();
         Ok(())
     }
 
     fn cleanup(&mut self) {
+        self.stop().ok();
         self.dispatcher.take();
     }
 
@@ -458,8 +622,10 @@ impl MusicSource for NetEaseMusicSource {
         self.dispatcher = Some(dispatcher);
     }
 
-    fn set_volume(&mut self, _volume: f32) {
-        // TODO: Implement volume control for NetEase Music streams
+    fn set_volume(&mut self, volume: f32) {
+        if let Some(sink) = &self.rodio_sink {
+            let _ = sink.lock().set_volume(volume);
+        }
     }
 }
 
@@ -688,7 +854,7 @@ impl MusicSource for NasSource {
 
     fn set_volume(&mut self, volume: f32) {
         if let Some(sink) = &self.rodio_sink {
-            sink.lock().set_volume(volume);
+            let _ = sink.lock().set_volume(volume);
         }
     }
 }

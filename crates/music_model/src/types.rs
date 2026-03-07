@@ -80,6 +80,7 @@ pub struct Track {
     pub source_type: SourceType,
     pub cover_url: Option<String>,
     pub parent: String,
+    pub lyrics: Option<String>,
 }
 
 impl Track {
@@ -109,6 +110,7 @@ impl Track {
             source_type,
             cover_url: None,
             parent,
+            lyrics: None,
         }
     }
 
@@ -131,6 +133,22 @@ impl Track {
             source_type: SourceType::Local,
             cover_url: None,
             parent,
+            lyrics: None,
+        }
+    }
+
+    pub fn netease(id: String, title: String, artist: String, album: String) -> Self {
+        Self {
+            id: id.clone(),
+            path: PathBuf::from(format!("netease:{}", id)),
+            title,
+            artist,
+            album,
+            duration: None,
+            source_type: SourceType::NetEaseMusic,
+            cover_url: None,
+            parent: String::from("NetEase Music"),
+            lyrics: None,
         }
     }
 }

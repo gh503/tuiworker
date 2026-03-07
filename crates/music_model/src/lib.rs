@@ -7,6 +7,7 @@ pub mod config;
 pub mod controller;
 pub mod error;
 pub mod events;
+pub mod lyrics;
 pub mod progress;
 pub mod queue;
 pub mod source;
@@ -19,10 +20,8 @@ pub use config::{ConfigManager, MusicConfig};
 pub use controller::PlayerController;
 pub use error::{MusicError, Result};
 pub use events::{EventDispatcher, MusicEvent, MusicEventListener};
+pub use lyrics::{LrcParser, LyricLine, Lyrics};
 pub use progress::ProgressTracker;
 pub use queue::PlayQueue;
-pub use source::{
-    Credentials, LocalSource, MusicSource, NasConfig, NasProtocol, NasSource, NetEaseMusicSource,
-    QqMusicSource,
-};
+pub use source::{Credentials, LocalSource, MusicSource};
 pub use types::{PlaybackMode, PlaybackState, SourceType, Track};

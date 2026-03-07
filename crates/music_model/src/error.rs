@@ -46,5 +46,11 @@ impl From<io::Error> for MusicError {
     }
 }
 
+impl From<reqwest::Error> for MusicError {
+    fn from(err: reqwest::Error) -> Self {
+        MusicError::PlaybackFailed(err.to_string())
+    }
+}
+
 /// Result type alias for music operations
 pub type Result<T> = std::result::Result<T, MusicError>;

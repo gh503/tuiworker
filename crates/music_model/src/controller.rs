@@ -217,6 +217,10 @@ impl PlayerController {
         *self.state.lock()
     }
 
+    pub fn get_position(&self) -> Duration {
+        self.progress_tracker.get_position()
+    }
+
     pub fn add_listener(&mut self, listener: Box<dyn crate::events::MusicEventListener>) {
         self.event_dispatcher.add_listener(listener);
     }

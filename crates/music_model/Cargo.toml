@@ -28,13 +28,15 @@ symphonia = { workspace = true }
 parking_lot = { workspace = true }
 rand = "0.8"
 
+# Music streaming APIs
+reqwest = { version = "0.12", features = ["json", "cookies", "blocking"] }
+url = "2.5"
+
 # NAS support (optional features)
-reqwest = { version = "0.12", optional = true }
 smb = { version = "0.4", optional = true }
 
 [features]
 default = []
-nas-webdav = ["reqwest"]
 nas-smb = ["smb"]
 
 [dev-dependencies]
