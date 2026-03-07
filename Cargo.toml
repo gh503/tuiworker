@@ -5,6 +5,7 @@ members = [
     "crates/logging",
     "crates/config_manager",
     "crates/ui",
+    "crates/music_model",
     "crates/modules/filebrowser",
     "crates/modules/todo",
     "crates/modules/note",

@@ -9,15 +9,7 @@ use ratatui::{
     Frame,
 };
 
-use std::{
-    path::{Path, PathBuf},
-    sync::{Arc, Mutex},
-    time::Duration,
-};
-
-use rand::seq::SliceRandom;
-
-use rodio::{OutputStream, OutputStreamHandle, Sink};
+use std::path::PathBuf;
 
 use ui::Theme;
 
@@ -26,120 +18,60 @@ use core::{
     module::{Module as CoreModule, Shortcut},
 };
 
-/// Music track metadata
-#[derive(Debug, Clone)]
-pub struct Track {
-    pub path: PathBuf,
-    pub title: String,
-    pub artist: String,
-    pub album: String,
-    pub duration: Option<Duration>,
+use music_model::{
+    MusicEvent, MusicEventListener, PlaybackMode, PlaybackState, PlayerController, Track,
+};
+
+/// UI event listener for music player
+pub struct UIEventListener {
+    module_id: String,
 }
 
-impl Track {
-    fn from_path(path: PathBuf) -> Self {
-        let filename = path
-            .file_name()
-            .and_then(|f| f.to_str())
-            .unwrap_or("Unknown")
-            .to_string();
+impl UIEventListener {
+    pub fn new(module_id: String) -> Self {
+        Self { module_id }
+    }
+}
 
-        // Try to parse metadata from filename
-        // Format: "Artist - Title.ext" or just "Title.ext"
-        let (artist, title) = if let Some(pos) = filename.find(" - ") {
-            let artist_part = &filename[..pos];
-            let title_part = &filename[pos + 3..];
-            let title_clean = title_part
-                .trim_end_matches(".mp3")
-                .trim_end_matches(".flac")
-                .trim_end_matches(".ogg")
-                .trim_end_matches(".wav")
-                .trim_end_matches(".m4a")
-                .to_string();
-            (artist_part.to_string(), title_clean)
-        } else {
-            let title_clean = filename
-                .trim_end_matches(".mp3")
-                .trim_end_matches(".flac")
-                .trim_end_matches(".ogg")
-                .trim_end_matches(".wav")
-                .trim_end_matches(".m4a")
-                .to_string();
-            ("Unknown".to_string(), title_clean)
-        };
-
-        Self {
-            path,
-            title,
-            artist,
-            album: "Unknown".to_string(),
-            duration: None,
+impl MusicEventListener for UIEventListener {
+    fn on_event(&self, event: MusicEvent) {
+        match event {
+            MusicEvent::StateChanged(new_state, _) => {
+                log::debug!("[{}] State changed: {:?}", self.module_id, new_state);
+            }
+            MusicEvent::ProgressUpdated { position, duration } => {
+                log::debug!(
+                    "[{}] Progress: {:?}/{:?}",
+                    self.module_id,
+                    position,
+                    duration
+                );
+            }
+            _ => {}
         }
     }
 }
 
-/// Playback state
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PlaybackState {
-    Stopped,
-    Playing,
-    Paused,
-}
-
-/// Repeat mode
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RepeatMode {
-    None,
-    All,
-    One,
-}
-
-/// Shuffle mode
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ShuffleMode {
-    Off,
-    On,
-}
-
 /// Main music module
 pub struct MusicModule {
-    tracks: Vec<Track>,
-    current_track_index: Option<usize>,
-    playback_state: PlaybackState,
-    volume: f32,
-    repeat_mode: RepeatMode,
-    shuffle_mode: ShuffleMode,
-    selected_index: usize,
+    controller: PlayerController,
     music_dir: PathBuf,
     theme: Theme,
-
-    // Audio components
-    _stream: Option<OutputStream>,
-    stream_handle: Option<OutputStreamHandle>,
-    sink: Option<Arc<Mutex<Sink>>>,
-
-    // Progress tracking
-    track_progress: Duration,
-    track_duration: Option<Duration>,
+    selected_index: usize,
 }
 
 impl MusicModule {
     pub fn new(music_dir: PathBuf) -> Self {
+        let mut controller = PlayerController::new();
+
+        let listener = Box::new(UIEventListener::new("music".to_string()));
+        controller.add_listener(listener);
+
         Self {
-            tracks: Vec::new(),
-            current_track_index: None,
-            playback_state: PlaybackState::Stopped,
-            volume: 0.7,
-            repeat_mode: RepeatMode::None,
-            shuffle_mode: ShuffleMode::Off,
-            selected_index: 0,
+            controller,
             music_dir,
             theme: Theme::default(),
-            _stream: None,
-            stream_handle: None,
-            sink: None,
-            track_progress: Duration::default(),
-            track_duration: None,
+            selected_index: 0,
         }
     }
 
@@ -156,14 +88,17 @@ impl MusicModule {
 
         let supported_extensions = ["mp3", "flac", "ogg", "wav", "m4a"];
         let music_dir = self.music_dir.clone();
-        self.tracks.clear();
         self.load_directory_recursive(&music_dir, &supported_extensions)?;
 
         Ok(())
     }
 
     /// Recursively load directory
-    fn load_directory_recursive(&mut self, dir: &Path, extensions: &[&str]) -> anyhow::Result<()> {
+    fn load_directory_recursive(
+        &mut self,
+        dir: &PathBuf,
+        extensions: &[&str],
+    ) -> anyhow::Result<()> {
         for entry in std::fs::read_dir(dir)? {
             let entry = entry?;
             let path = entry.path();
@@ -172,159 +107,83 @@ impl MusicModule {
                 self.load_directory_recursive(&path, extensions)?;
             } else if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
                 if extensions.iter().any(|&e| e.eq_ignore_ascii_case(ext)) {
-                    let track = Track::from_path(path);
-                    self.tracks.push(track);
+                    let filename = path
+                        .file_name()
+                        .and_then(|f| f.to_str())
+                        .unwrap_or("Unknown")
+                        .to_string();
+
+                    let title = filename
+                        .trim_end_matches(".mp3")
+                        .trim_end_matches(".flac")
+                        .trim_end_matches(".ogg")
+                        .trim_end_matches(".wav")
+                        .trim_end_matches(".m4a")
+                        .to_string();
+
+                    let artist = String::from("Unknown");
+
+                    let track = Track::local(path, title, artist);
+                    self.controller.add_track(track);
                 }
             }
-        }
-
-        Ok(())
-    }
-
-    /// Initialize audio output
-    fn init_audio(&mut self) -> anyhow::Result<()> {
-        if self.stream_handle.is_none() {
-            let (stream, stream_handle) = OutputStream::try_default()?;
-            self._stream = Some(stream);
-            self.stream_handle = Some(stream_handle);
-
-            let sink = Sink::try_new(&self.stream_handle.as_ref().unwrap())?;
-            let sink = Arc::new(Mutex::new(sink));
-            self.sink = Some(sink);
         }
 
         Ok(())
     }
 
     /// Play track
-    pub fn play(&mut self, index: usize) -> anyhow::Result<()> {
-        if index >= self.tracks.len() {
-            return Ok(());
+    pub fn play(&mut self, index: usize) {
+        if let Err(e) = self.controller.play_track(index) {
+            log::error!("Failed to play track: {}", e);
         }
-
-        self.init_audio()?;
-
-        let track = self.tracks[index].clone();
-        let file = std::fs::File::open(&track.path)?;
-
-        if let Some(ref handle) = self.stream_handle {
-            let decoder = rodio::Decoder::new(std::io::BufReader::new(file))?;
-
-            if let Some(ref sink) = self.sink {
-                let mut sink = sink.lock().unwrap();
-                sink.stop();
-                sink.append(decoder);
-                sink.play();
-                drop(sink);
-            }
-
-            self.current_track_index = Some(index);
-            self.playback_state = PlaybackState::Playing;
-            self.track_progress = Duration::default();
-        }
-
-        Ok(())
     }
 
     /// Pause playback
     pub fn pause(&mut self) {
-        if let Some(ref sink) = self.sink {
-            sink.lock().unwrap().pause();
-            self.playback_state = PlaybackState::Paused;
+        if let Err(e) = self.controller.pause() {
+            log::error!("Failed to pause: {}", e);
         }
     }
 
     /// Resume playback
     pub fn resume(&mut self) {
-        if let Some(ref sink) = self.sink {
-            sink.lock().unwrap().play();
-            self.playback_state = PlaybackState::Playing;
+        if let Err(e) = self.controller.resume() {
+            log::error!("Failed to resume: {}", e);
         }
     }
 
     /// Stop playback
     pub fn stop(&mut self) {
-        if let Some(ref sink) = self.sink {
-            sink.lock().unwrap().stop();
+        if let Err(e) = self.controller.stop() {
+            log::error!("Failed to stop: {}", e);
         }
-        self.playback_state = PlaybackState::Stopped;
-        self.current_track_index = None;
-        self.track_progress = Duration::default();
     }
 
     /// Next track
     pub fn next_track(&mut self) {
-        if self.tracks.is_empty() {
-            return;
+        self.controller.next_track();
+        if let Some(index) = self.controller.get_queue().current_index() {
+            self.play(index);
         }
-
-        let next_index = match self.current_track_index {
-            Some(idx) => {
-                if idx + 1 < self.tracks.len() {
-                    idx + 1
-                } else if self.repeat_mode == RepeatMode::All {
-                    0
-                } else {
-                    return;
-                }
-            }
-            None => return,
-        };
-
-        let _ = self.play(next_index);
     }
 
     /// Previous track
     pub fn prev_track(&mut self) {
-        if self.tracks.is_empty() {
-            return;
+        self.controller.prev_track();
+        if let Some(index) = self.controller.get_queue().current_index() {
+            self.play(index);
         }
-
-        let prev_index = match self.current_track_index {
-            Some(idx) => {
-                if idx > 0 {
-                    idx - 1
-                } else if self.repeat_mode == RepeatMode::All {
-                    self.tracks.len() - 1
-                } else {
-                    return;
-                }
-            }
-            None => return,
-        };
-
-        let _ = self.play(prev_index);
     }
 
     /// Set volume
     pub fn set_volume(&mut self, volume: f32) {
-        self.volume = volume.clamp(0.0, 1.0);
-        if let Some(ref sink) = self.sink {
-            sink.lock().unwrap().set_volume(self.volume);
-        }
+        self.controller.set_volume(volume);
     }
 
     /// Toggle repeat mode
     pub fn toggle_repeat(&mut self) {
-        self.repeat_mode = match self.repeat_mode {
-            RepeatMode::None => RepeatMode::All,
-            RepeatMode::All => RepeatMode::One,
-            RepeatMode::One => RepeatMode::None,
-        };
-    }
-
-    /// Toggle shuffle mode
-    pub fn toggle_shuffle(&mut self) {
-        self.shuffle_mode = match self.shuffle_mode {
-            ShuffleMode::Off => ShuffleMode::On,
-            ShuffleMode::On => ShuffleMode::Off,
-        };
-
-        if self.shuffle_mode == ShuffleMode::On {
-            use rand::seq::SliceRandom;
-            let mut rng = rand::thread_rng();
-            self.tracks.shuffle(&mut rng);
-        }
+        self.controller.cycle_playback_mode();
     }
 
     /// Navigate up
@@ -334,14 +193,18 @@ impl MusicModule {
 
     /// Navigate down
     pub fn navigate_down(&mut self) {
-        self.selected_index = (self.selected_index + 1).min(self.tracks.len().saturating_sub(1));
+        self.selected_index =
+            (self.selected_index + 1).min(self.controller.get_queue().len().saturating_sub(1));
     }
 
     /// Draw playlist
     fn draw_playlist(&self, frame: &mut Frame, area: Rect) {
+        let tracks = self.controller.get_queue().get_tracks();
+        let current_index = self.controller.get_queue().current_index();
+
         let mut lines = vec![
             Line::from(vec![Span::styled(
-                format!("播放列表 ({} 首)", self.tracks.len()),
+                format!("播放列表 ({} 首)", tracks.len()),
                 Style::default()
                     .fg(self.theme.primary())
                     .add_modifier(Modifier::BOLD),
@@ -349,7 +212,7 @@ impl MusicModule {
             Line::default(),
         ];
 
-        if self.tracks.is_empty() {
+        if tracks.is_empty() {
             lines.push(Line::from("没有找到音乐文件"));
             lines.push(Line::from(format!(
                 "音乐目录: {}",
@@ -358,11 +221,11 @@ impl MusicModule {
         } else {
             let visible_count = area.height.saturating_sub(3) as usize / 2;
             let start = self.selected_index.saturating_sub(visible_count / 2);
-            let end = (start + visible_count).min(self.tracks.len());
+            let end = (start + visible_count).min(tracks.len());
 
             for i in start..end {
-                let track = &self.tracks[i];
-                let is_current = self.current_track_index == Some(i);
+                let track = &tracks[i];
+                let is_current = current_index == Some(i);
                 let is_selected = i == self.selected_index;
 
                 let style = if is_selected {
@@ -402,55 +265,50 @@ impl MusicModule {
     fn draw_player(&self, frame: &mut Frame, area: Rect) {
         let mut lines = vec![];
 
-        // Current track info
-        if let Some(idx) = self.current_track_index {
-            if let Some(track) = self.tracks.get(idx) {
-                lines.push(Line::from(vec![
-                    Span::styled("正在播放: ", Style::default().fg(self.theme.muted())),
-                    Span::styled(
-                        format!("{} - {}", track.artist, track.title),
-                        Style::default()
-                            .fg(self.theme.primary())
-                            .add_modifier(Modifier::BOLD),
-                    ),
-                ]));
-            }
+        let current_track = self.controller.get_current_track();
+        let state = self.controller.get_state();
+
+        if let Some(track) = current_track {
+            lines.push(Line::from(vec![
+                Span::styled("正在播放: ", Style::default().fg(self.theme.muted())),
+                Span::styled(
+                    format!("{} - {}", track.artist, track.title),
+                    Style::default()
+                        .fg(self.theme.primary())
+                        .add_modifier(Modifier::BOLD),
+                ),
+            ]));
         } else {
             lines.push(Line::from("没有正在播放的曲目"));
         }
 
         lines.push(Line::default());
 
-        // Playback controls
-        let playback_status = match self.playback_state {
+        let playback_status = match state {
             PlaybackState::Playing => "播放中",
             PlaybackState::Paused => "已暂停",
             PlaybackState::Stopped => "已停止",
+            PlaybackState::Loading => "加载中",
+            PlaybackState::Buffering => "缓冲中",
         };
+
+        let mode = self.controller.get_queue().get_mode();
 
         lines.push(Line::from(vec![
             Span::styled("状态: ", Style::default().fg(self.theme.muted())),
             Span::styled(playback_status, Style::default()),
             Span::styled("  |  ", Style::default()),
             Span::styled(
-                format!("音量: {:.0}%", self.volume * 100.0),
+                format!("音量: {:.0}%", self.controller.get_volume() * 100.0),
                 Style::default(),
             ),
             Span::styled("  |  ", Style::default()),
             Span::styled(
-                match self.repeat_mode {
-                    RepeatMode::None => "循环: 关",
-                    RepeatMode::All => "循环: 全部",
-                    RepeatMode::One => "循环: 单曲",
-                },
-                Style::default(),
-            ),
-            Span::styled("  |  ", Style::default()),
-            Span::styled(
-                if self.shuffle_mode == ShuffleMode::On {
-                    "随机: 开"
-                } else {
-                    "随机: 关"
+                match mode {
+                    PlaybackMode::Sequential => "顺序",
+                    PlaybackMode::Random => "随机",
+                    PlaybackMode::RepeatOne => "单曲循环",
+                    PlaybackMode::RepeatAll => "列表循环",
                 },
                 Style::default(),
             ),
@@ -482,15 +340,16 @@ impl MusicModule {
                     .fg(self.theme.primary())
                     .bg(self.theme.surface()),
             )
-            .percent((self.volume * 100.0) as u16)
-            .label(format!("{:.0}%", self.volume * 100.0));
+            .percent((self.controller.get_volume() * 100.0) as u16)
+            .label(format!("{:.0}%", self.controller.get_volume() * 100.0));
 
         frame.render_widget(gauge, area);
     }
 
     /// Draw help bar
     fn draw_help_bar(&self, frame: &mut Frame, area: Rect) {
-        let help = "Space:播放/停止 <:音量- >:音量+ r:切换循环 s:切换随机 n:下一首 p:上一首 j/k:导航 Enter:播放选中";
+        let help =
+            "Space:播放/停止 <:音量- >:音量+ r:切换循环 n:下一首 p:上一首 j/k:导航 Enter:播放选中";
         let paragraph = Paragraph::new(help).style(Style::default().fg(self.theme.muted()));
         frame.render_widget(paragraph, area);
     }
@@ -499,31 +358,27 @@ impl MusicModule {
     fn handle_key_event(&mut self, key: KeyEvent) -> Action {
         match key.code {
             KeyCode::Char(' ') => {
-                match self.playback_state {
+                match self.controller.get_state() {
                     PlaybackState::Playing => self.pause(),
                     PlaybackState::Paused => self.resume(),
-                    PlaybackState::Stopped => {
-                        if !self.tracks.is_empty() {
-                            let _ = self.play(self.selected_index);
+                    _ => {
+                        if !self.controller.get_queue().is_empty() {
+                            self.play(self.selected_index);
                         }
                     }
                 }
                 Action::None
             }
             KeyCode::Char('>') => {
-                self.set_volume(self.volume + 0.1);
+                self.set_volume(self.controller.get_volume() + 0.1);
                 Action::None
             }
             KeyCode::Char('<') => {
-                self.set_volume(self.volume - 0.1);
+                self.set_volume(self.controller.get_volume() - 0.1);
                 Action::None
             }
             KeyCode::Char('r') | KeyCode::Char('R') => {
                 self.toggle_repeat();
-                Action::None
-            }
-            KeyCode::Char('s') | KeyCode::Char('S') => {
-                self.toggle_shuffle();
                 Action::None
             }
             KeyCode::Char('n') | KeyCode::Char('N') => {
@@ -543,8 +398,8 @@ impl MusicModule {
                 Action::None
             }
             KeyCode::Enter => {
-                if !self.tracks.is_empty() {
-                    let _ = self.play(self.selected_index);
+                if !self.controller.get_queue().is_empty() {
+                    self.play(self.selected_index);
                 }
                 Action::None
             }
@@ -584,6 +439,7 @@ impl CoreModule for MusicModule {
             ])
             .split(area);
 
+        self.controller.update();
         self.draw_player(frame, layout[0]);
         self.draw_playlist(frame, layout[1]);
         self.draw_volume(frame, layout[2]);
@@ -614,10 +470,6 @@ impl CoreModule for MusicModule {
                 description: "切换循环",
             },
             Shortcut {
-                key: "s",
-                description: "切换随机",
-            },
-            Shortcut {
                 key: "n/p",
                 description: "上/下一首",
             },
@@ -640,12 +492,6 @@ impl CoreModule for MusicModule {
     fn cleanup(&mut self) -> anyhow::Result<()> {
         self.stop();
         Ok(())
-    }
-}
-
-impl Drop for MusicModule {
-    fn drop(&mut self) {
-        let _ = self.cleanup();
     }
 }
 

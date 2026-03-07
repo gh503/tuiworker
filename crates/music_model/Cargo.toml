@@ -1,0 +1,33 @@
+[package]
+name = "music_model"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+# Core dependencies
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Configuration
+toml = { workspace = true }
+dirs = { workspace = true }
+
+# Audio playback
+rodio = { workspace = true }
+symphonia = { workspace = true }
+
+# Concurrency
+parking_lot = { workspace = true }
+rand = "0.8"
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3.8"

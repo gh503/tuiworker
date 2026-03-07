@@ -8,11 +8,10 @@ license.workspace = true
 [dependencies]
 core = { path = "../../core" }
 ui = { path = "../../ui" }
+music_model = { path = "../../music_model" }
 crossterm = { workspace = true }
 ratatui = { workspace = true }
 anyhow = { workspace = true }
-rodio = { workspace = true }
 log = { workspace = true }
-dirs = { workspace = true }
-parking_lot = { workspace = true }
 rand = "0.8"
+parking_lot = { workspace = true }
