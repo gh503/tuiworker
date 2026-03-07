@@ -29,7 +29,11 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     #[cfg(feature = "music")]
     {
-        info!("Music module is available");
+        use music::Music;
+        let music_dir = home_dir.join("Music");
+        let music_module = Music::new(music_dir);
+        app.register_module(music_module);
+        info!("Registered Music module");
     }
 
     #[cfg(feature = "git")]
