@@ -324,6 +324,29 @@ impl QqMusicSource {
             })
             .map(|s| s.to_string())
     }
+
+    fn fetch_lyrics_sync(&self, songmid: &str) -> Result<String> {
+        let url = format!(
+            "{}/lyric?id={}",
+            self.api_base_url.trim_end_matches('/'),
+            songmid
+        );
+
+        let client = reqwest::blocking::Client::new();
+        let response = client.get(&url).send().map_err(|e| {
+            crate::error::MusicError::PlaybackFailed(format!("QQ Music lyrics fetch failed: {}", e))
+        })?;
+
+        let json: serde_json::Value = response.json().map_err(|e| {
+            crate::error::MusicError::PlaybackFailed(format!("JSON parse failed: {}", e))
+        })?;
+
+        if let Some(lyric) = json["lyric"].as_str() {
+            Ok(lyric.to_string())
+        } else {
+            Ok("".to_string())
+        }
+    }
 }
 
 impl Default for QqMusicSource {
@@ -391,9 +414,18 @@ impl MusicSource for QqMusicSource {
         self.position = Duration::default();
         self.duration = track.duration;
 
-        self.dispatch_event(MusicEvent::TrackChanged(track.clone()));
+        let song_id = track.id.clone();
+        let lyrics_text = self.fetch_lyrics_sync(&song_id);
 
         log::info!("[QQ Music] Song loaded successfully: {}", track.title);
+
+        let mut track_with_lyrics = track.clone();
+        if let Ok(lyrics) = lyrics_text {
+            log::info!("[QQ Music] Loaded {} characters of lyrics", lyrics.len());
+            track_with_lyrics.lyrics = Some(lyrics);
+        }
+
+        self.dispatch_event(MusicEvent::TrackChanged(track_with_lyrics));
         Ok(())
     }
 
@@ -593,6 +625,45 @@ impl NetEaseMusicSource {
             .ok_or_else(|| crate::error::MusicError::PlaybackFailed("No lyrics found".to_string()))?
             .to_string())
     }
+
+    fn search_netease_sync(&self, query: &str, limit: u32) -> Result<Vec<Track>> {
+        let url = format!(
+            "{}/search?keywords={}&limit={}&type=1",
+            self.api_base_url.trim_end_matches('/'),
+            query,
+            limit
+        );
+
+        let client = reqwest::blocking::Client::new();
+        let response = client.get(&url).send().map_err(|e| {
+            crate::error::MusicError::PlaybackFailed(format!("NetEase Music search failed: {}", e))
+        })?;
+
+        let json: serde_json::Value = response.json().map_err(|e| {
+            crate::error::MusicError::PlaybackFailed(format!("JSON parse failed: {}", e))
+        })?;
+
+        let mut tracks = Vec::new();
+
+        if let Some(result) = json["result"]["songs"].as_array() {
+            for song in result.iter().take(limit as usize) {
+                let id = song["id"]
+                    .as_u64()
+                    .map(|i| i.to_string())
+                    .unwrap_or_default();
+                let title = song["name"].as_str().unwrap_or("Unknown");
+                let artist = song["artists"][0]["name"].as_str().unwrap_or("Unknown");
+                let album = song["album"]["name"].as_str().unwrap_or("");
+
+                let track =
+                    Track::netease(id, title.to_string(), artist.to_string(), album.to_string());
+                tracks.push(track);
+            }
+        }
+
+        log::info!("[NetEase Music] Search returned {} tracks", tracks.len());
+        Ok(tracks)
+    }
 }
 
 impl Default for NetEaseMusicSource {
@@ -722,9 +793,18 @@ impl MusicSource for NetEaseMusicSource {
         None
     }
 
-    fn search(&self, _query: &str) -> Result<Vec<Track>> {
-        // TODO: Implement NetEase Music search API
-        Ok(Vec::new())
+    fn search(&self, query: &str) -> Result<Vec<Track>> {
+        log::info!("[NetEase Music] Searching for: {}", query);
+        match self.search_netease_sync(query, 30) {
+            Ok(tracks) => {
+                log::info!("[NetEase Music] Found {} tracks", tracks.len());
+                Ok(tracks)
+            }
+            Err(e) => {
+                log::error!("[NetEase Music] Search failed: {:?}", e);
+                Ok(Vec::new())
+            }
+        }
     }
 
     fn get_source_type(&self) -> SourceType {
