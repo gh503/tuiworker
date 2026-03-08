@@ -685,20 +685,24 @@ impl CoreModule for MusicModule {
     }
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) {
-        let chunks = Layout::default()
+        let vertical_chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(5),
-                Constraint::Min(8),
+                Constraint::Min(12),
                 Constraint::Min(10),
                 Constraint::Length(3),
             ])
             .split(area);
 
-        self.draw_player(frame, chunks[0]);
-        self.draw_lyrics(frame, chunks[1]);
-        self.draw_playlist(frame, chunks[2]);
-        self.draw_help_bar(frame, chunks[3]);
+        let top_chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(vertical_chunks[0]);
+
+        self.draw_player(frame, top_chunks[0]);
+        self.draw_lyrics(frame, top_chunks[1]);
+        self.draw_playlist(frame, vertical_chunks[1]);
+        self.draw_help_bar(frame, vertical_chunks[2]);
     }
 
     fn save(&self) -> anyhow::Result<()> {
