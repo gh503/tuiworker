@@ -423,7 +423,7 @@ impl MusicModule {
 
                     let paragraph = Paragraph::new(Text::from(lines))
                         .block(Block::default().borders(Borders::ALL))
-                        .wrap(Wrap { trim: true });
+                        .wrap(Wrap { trim: false });
 
                     frame.render_widget(paragraph, area);
                 }
@@ -529,14 +529,14 @@ impl MusicModule {
                 Span::styled(
                     format!("{:.0}%", volume * 100.0),
                     Style::default()
-                        .fg(Color::Cyan)
+                        .fg(Color::White)
                         .add_modifier(Modifier::BOLD),
                 ),
                 Span::styled("  模式:", Style::default().fg(self.theme.muted())),
                 Span::styled(
                     mode_text,
                     Style::default()
-                        .fg(Color::Cyan)
+                        .fg(Color::Yellow)
                         .add_modifier(Modifier::BOLD),
                 ),
             ]
@@ -688,7 +688,7 @@ impl CoreModule for MusicModule {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(4),
+                Constraint::Length(5),
                 Constraint::Min(8),
                 Constraint::Min(10),
                 Constraint::Length(3),
