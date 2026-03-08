@@ -8,6 +8,7 @@ repository.workspace = true
 
 [dependencies]
 # Core dependencies
+log = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 serde = { workspace = true }
 serde_json = { workspace = true }

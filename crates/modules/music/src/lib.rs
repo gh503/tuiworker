@@ -227,16 +227,35 @@ impl MusicModule {
             SourceType::Nas { .. } => SourceType::Local,
         };
 
+        let music_dir = self.music_dir.display().to_string();
         let new_source = self.get_source_name();
         log::info!("[Music] Switched from {} to {}", old_source, new_source);
 
-        if new_source == "NetEase Music" {
-            log::info!("[Music] NetEase Music selected. Note: Search functionality is not yet implemented.");
-            log::info!("[Music] To use NetEase Music, you need to enable it in config: ~/.config/tuiworker/music.toml");
-        }
-
         self.controller.clear_queue();
         self.selected_index = 0;
+
+        let is_local = matches!(self.current_source, SourceType::Local);
+        let is_netease = matches!(self.current_source, SourceType::NetEaseMusic);
+        let is_qq = matches!(self.current_source, SourceType::QqMusic);
+
+        if is_local {
+            log::info!("[Music] Loading local music from: {}", music_dir);
+            if let Err(e) = self.load_music() {
+                log::error!("[Music] Failed to load music: {}", e);
+            }
+            log::info!(
+                "[Music] Loaded {} tracks",
+                self.controller.get_queue().len()
+            );
+        } else if is_netease {
+            log::info!(
+                "[Music] NetEase Music selected. Search functionality is not yet implemented."
+            );
+            log::info!("[Music] To use NetEase Music, you need to enable it in config: ~/.config/tuiworker/music.toml");
+        } else if is_qq {
+            log::info!("[Music] QQ Music selected. Search functionality is not yet implemented.");
+            log::info!("[Music] Reference: QQMusicApi at /home/gh503/Code/QQMusicApi");
+        }
     }
 
     /// Navigate up
@@ -494,19 +513,35 @@ impl MusicModule {
             PlaybackMode::RepeatAll => "列表循环",
         };
 
-        lines.push(Line::from(vec![
-            Span::styled("源:", Style::default().fg(self.theme.muted())),
-            Span::styled(source_name, Style::default().fg(self.theme.primary())),
-            Span::styled(" 状态:", Style::default().fg(self.theme.muted())),
-            Span::styled(playback_status, Style::default()),
-            Span::styled(" 音量:", Style::default().fg(self.theme.muted())),
-            Span::styled(
-                format!("{:.0}%", volume * 100.0),
-                Style::default().fg(Color::White),
-            ),
-            Span::styled(" 模式:", Style::default().fg(self.theme.muted())),
-            Span::styled(mode_text, Style::default().fg(Color::White)),
-        ]));
+        lines.push(
+            vec![
+                Span::styled("源:", Style::default().fg(self.theme.muted())),
+                Span::styled(source_name, Style::default().fg(self.theme.primary())),
+                Span::styled(" 状态:", Style::default().fg(self.theme.muted())),
+                Span::styled(playback_status, Style::default()),
+            ]
+            .into(),
+        );
+
+        lines.push(
+            vec![
+                Span::styled("音量:", Style::default().fg(self.theme.muted())),
+                Span::styled(
+                    format!("{:.0}%", volume * 100.0),
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled("  模式:", Style::default().fg(self.theme.muted())),
+                Span::styled(
+                    mode_text,
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ),
+            ]
+            .into(),
+        );
 
         let paragraph = Paragraph::new(Text::from(lines))
             .block(
@@ -653,7 +688,7 @@ impl CoreModule for MusicModule {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(3),
+                Constraint::Length(4),
                 Constraint::Min(8),
                 Constraint::Min(10),
                 Constraint::Length(3),

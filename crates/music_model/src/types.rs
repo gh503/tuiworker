@@ -1,5 +1,6 @@
 //! Core data types for the music player
 
+use log;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::Duration;
@@ -142,15 +143,44 @@ impl Track {
     fn load_lyrics_from_file(audio_path: &std::path::Path) -> Option<String> {
         let lyrics_path = audio_path.with_extension("lrc");
 
-        if !lyrics_path.exists() {
-            return None;
+        log::debug!("[Track] Looking for lyrics: {}", lyrics_path.display());
+
+        if lyrics_path.exists() {
+            log::info!("[Track] Found lyrics file: {}", lyrics_path.display());
+            match std::fs::read_to_string(&lyrics_path) {
+                Ok(content) => {
+                    log::info!("[Track] Loaded {} characters of lyrics", content.len());
+                    return Some(content);
+                }
+                Err(e) => {
+                    log::error!("[Track] Failed to read lyrics: {}", e);
+                }
+            }
+        } else {
+            let audio_str = audio_path.to_string_lossy();
+            if let Some(pos) = audio_str.rfind('.') {
+                let uppercase_path = format!("{}.LRC", &audio_str[..pos]);
+                let upper_path = std::path::PathBuf::from(&uppercase_path);
+                if upper_path.exists() {
+                    log::info!(
+                        "[Track] Found lyrics file (uppercase): {}",
+                        upper_path.display()
+                    );
+                    match std::fs::read_to_string(&upper_path) {
+                        Ok(content) => {
+                            log::info!("[Track] Loaded {} characters of lyrics", content.len());
+                            return Some(content);
+                        }
+                        Err(e) => {
+                            log::error!("[Track] Failed to read lyrics: {}", e);
+                        }
+                    }
+                }
+            }
         }
 
-        if let Ok(content) = std::fs::read_to_string(&lyrics_path) {
-            Some(content)
-        } else {
-            None
-        }
+        log::debug!("[Track] No lyrics file found for: {}", audio_path.display());
+        None
     }
 
     pub fn netease(id: String, title: String, artist: String, album: String) -> Self {
