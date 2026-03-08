@@ -509,7 +509,7 @@ impl MusicModule {
                     .borders(Borders::ALL)
                     .border_style(self.theme.border()),
             )
-            .wrap(Wrap { trim: false });
+            .wrap(Wrap { trim: true });
 
         frame.render_widget(paragraph, area);
     }
@@ -647,7 +647,7 @@ impl CoreModule for MusicModule {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(3),
+                Constraint::Length(4),
                 Constraint::Min(8),
                 Constraint::Min(10),
                 Constraint::Length(3),
