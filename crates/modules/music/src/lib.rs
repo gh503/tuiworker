@@ -357,6 +357,10 @@ impl MusicModule {
     /// Draw lyrics panel
     fn draw_lyrics(&self, frame: &mut Frame, area: Rect) {
         let current_track = self.controller.get_current_track();
+        log::debug!(
+            "[Music] draw_lyrics: current_track.is_none() = {}",
+            current_track.is_none()
+        );
 
         if current_track.is_none() {
             let paragraph = Paragraph::new(Text::from(vec![
@@ -375,12 +379,26 @@ impl MusicModule {
         }
 
         let track = current_track.unwrap();
+        log::debug!(
+            "[Music] draw_lyrics: track.lyrics.is_some() = {}, title={}",
+            track.lyrics.is_some(),
+            track.title
+        );
 
         if let Some(lrc_text) = &track.lyrics {
+            log::info!(
+                "[Music] draw_lyrics: Found {} characters of lyrics for track: {}",
+                lrc_text.len(),
+                track.title
+            );
             use music_model::{LrcParser, Lyrics};
 
             match LrcParser::parse(lrc_text) {
                 Ok(lyrics) => {
+                    log::info!(
+                        "[Music] draw_lyrics: Parsed {} lyrics lines",
+                        lyrics.lines.len()
+                    );
                     let position = self.controller.get_position();
                     let current_index = lyrics.find_current_line(position);
 
@@ -406,9 +424,7 @@ impl MusicModule {
                         if let Some(line) = lyrics.get_line(i) {
                             let is_current = current_index == Some(i);
                             let style = if is_current {
-                                Style::default()
-                                    .fg(Color::Cyan)
-                                    .add_modifier(Modifier::BOLD)
+                                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
                             } else {
                                 Style::default().fg(self.theme.muted())
                             };
@@ -427,7 +443,12 @@ impl MusicModule {
 
                     frame.render_widget(paragraph, area);
                 }
-                Err(_) => {
+                Err(e) => {
+                    log::error!(
+                        "[Music] draw_lyrics: Failed to parse lyrics for track {}: {:?}",
+                        track.title,
+                        e
+                    );
                     let paragraph = Paragraph::new(Text::from(vec![
                         Line::from(vec![Span::styled(
                             "歌词",
@@ -436,8 +457,9 @@ impl MusicModule {
                         Line::default(),
                         Line::from("歌词解析失败"),
                         Line::default(),
-                        Line::from("LRC格式: [MM:SS.ms] 歌词文本"),
-                        Line::from("示例: [00:00.00] First line"),
+                        Line::from(format!("错误: {:?}", e)),
+                        Line::default(),
+                        Line::from("请检查.lrc文件格式"),
                     ]))
                     .block(Block::default().borders(Borders::ALL))
                     .wrap(Wrap { trim: true });
@@ -446,6 +468,11 @@ impl MusicModule {
                 }
             }
         } else {
+            log::warn!(
+                "[Music] draw_lyrics: No lyrics field for track: {} (path: {})",
+                track.title,
+                track.path.display()
+            );
             let paragraph = Paragraph::new(Text::from(vec![
                 Line::from(vec![Span::styled(
                     format!("歌词 - {} [{}]", track.title, track.artist),
@@ -454,10 +481,24 @@ impl MusicModule {
                         .add_modifier(Modifier::BOLD),
                 )]),
                 Line::default(),
-                Line::from("暂无歌词"),
+                Line::from(vec![Span::styled(
+                    "暂无歌词",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                )]),
                 Line::default(),
-                Line::from("NetEase Music: 播放时自动获取歌词"),
-                Line::from("Local: 支持内嵌歌词文件"),
+                Line::from("提示: 请在音乐文件同目录下放置同名.lrc文件"),
+                Line::from(format!(
+                    "音乐文件: {}",
+                    track
+                        .path
+                        .file_name()
+                        .unwrap_or(std::ffi::OsStr::new("unknown"))
+                        .to_string_lossy()
+                )),
+                Line::default(),
+                Line::from("示例: song.mp3 -> song.lrc"),
             ]))
             .block(Block::default().borders(Borders::ALL))
             .wrap(Wrap { trim: true });

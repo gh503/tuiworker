@@ -32,6 +32,7 @@ rand = "0.8"
 # Music streaming APIs
 reqwest = { version = "0.12", features = ["json", "cookies", "blocking"] }
 url = "2.5"
+encoding_rs = "0.8"
 
 # NAS support (optional features)
 smb = { version = "0.4", optional = true }

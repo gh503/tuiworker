@@ -145,37 +145,66 @@ impl Track {
 
         log::debug!("[Track] Looking for lyrics: {}", lyrics_path.display());
 
-        if lyrics_path.exists() {
-            log::info!("[Track] Found lyrics file: {}", lyrics_path.display());
-            match std::fs::read_to_string(&lyrics_path) {
-                Ok(content) => {
-                    log::info!("[Track] Loaded {} characters of lyrics", content.len());
-                    return Some(content);
-                }
-                Err(e) => {
-                    log::error!("[Track] Failed to read lyrics: {}", e);
+        if let Ok(bytes) = std::fs::read(&lyrics_path) {
+            log::info!(
+                "[Track] Found lyrics file: {} ({} bytes)",
+                lyrics_path.display(),
+                bytes.len()
+            );
+
+            let encodings: Vec<(&str, &encoding_rs::Encoding)> = vec![
+                ("UTF-8", encoding_rs::UTF_8),
+                ("GBK", encoding_rs::GBK),
+                ("GB18030", encoding_rs::GB18030),
+                ("BIG5", encoding_rs::BIG5),
+                ("WINDOWS-1252", encoding_rs::WINDOWS_1252),
+            ];
+
+            for encoding in encodings {
+                let (decoder, _used_encoding, had_malformed) = encoding.1.decode(&bytes);
+                if !had_malformed {
+                    let text = decoder.to_string();
+                    log::info!(
+                        "[Track] Successfully decoded lyrics using {} ({} characters)",
+                        encoding.0,
+                        text.len()
+                    );
+                    return Some(text);
                 }
             }
-        } else {
-            let audio_str = audio_path.to_string_lossy();
-            if let Some(pos) = audio_str.rfind('.') {
-                let uppercase_path = format!("{}.LRC", &audio_str[..pos]);
-                let upper_path = std::path::PathBuf::from(&uppercase_path);
-                if upper_path.exists() {
-                    log::info!(
-                        "[Track] Found lyrics file (uppercase): {}",
-                        upper_path.display()
-                    );
-                    match std::fs::read_to_string(&upper_path) {
-                        Ok(content) => {
-                            log::info!("[Track] Loaded {} characters of lyrics", content.len());
-                            return Some(content);
-                        }
-                        Err(e) => {
-                            log::error!("[Track] Failed to read lyrics: {}", e);
-                        }
+
+            log::warn!("[Track] Failed to decode lyrics with any known encoding");
+        }
+
+        let audio_str = audio_path.to_string_lossy();
+        if let Some(pos) = audio_str.rfind('.') {
+            let uppercase_path = format!("{}.LRC", &audio_str[..pos]);
+            let upper_path = std::path::PathBuf::from(&uppercase_path);
+            if let Ok(bytes) = std::fs::read(&upper_path) {
+                log::info!(
+                    "[Track] Found lyrics file (uppercase): {} ({} bytes)",
+                    upper_path.display(),
+                    bytes.len()
+                );
+
+                let encodings: Vec<(&str, &encoding_rs::Encoding)> = vec![
+                    ("UTF-8", encoding_rs::UTF_8),
+                    ("GBK", encoding_rs::GBK),
+                    ("GB18030", encoding_rs::GB18030),
+                    ("BIG5", encoding_rs::BIG5),
+                    ("WINDOWS-1252", encoding_rs::WINDOWS_1252),
+                ];
+
+                for encoding in encodings {
+                    let (decoder, _used_encoding, had_malformed) = encoding.1.decode(&bytes);
+                    if !had_malformed {
+                        let text = decoder.to_string();
+                        log::info!("[Track] Successfully decoded uppercase lyrics using {} ({} characters)", encoding.0, text.len());
+                        return Some(text);
                     }
                 }
+
+                log::warn!("[Track] Failed to decode uppercase lyrics with any known encoding");
             }
         }
 
