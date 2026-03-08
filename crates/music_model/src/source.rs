@@ -251,10 +251,78 @@ impl QqMusicSource {
         }
     }
 
+    fn initialize_audio_output(&mut self) -> Result<()> {
+        if self.stream_handle.is_none() {
+            let (stream, handle) = rodio::OutputStream::try_default()
+                .map_err(|e| crate::error::MusicError::PlaybackFailed(e.to_string()))?;
+            self._stream = Some(stream);
+            self.stream_handle = Some(handle);
+        }
+        Ok(())
+    }
+
     fn dispatch_event(&self, event: MusicEvent) {
         if let Some(dispatcher) = &self.dispatcher {
             dispatcher.dispatch(event);
         }
+    }
+
+    fn search_qq_music_sync(&self, query: &str, limit: u32) -> Result<Vec<Track>> {
+        let url = format!(
+            "{}/search/w/{}/{}/1/{}",
+            self.api_base_url.trim_end_matches('/'),
+            query,
+            1,
+            limit
+        );
+
+        let client = reqwest::blocking::Client::new();
+        let response = client.get(&url).send().map_err(|e| {
+            crate::error::MusicError::PlaybackFailed(format!("QQ Music search failed: {}", e))
+        })?;
+
+        let json: serde_json::Value = response.json().map_err(|e| {
+            crate::error::MusicError::PlaybackFailed(format!("JSON parse failed: {}", e))
+        })?;
+
+        let mut tracks = Vec::new();
+
+        if let Some(data) = json["data"]["song"]["list"].as_array() {
+            for song in data.iter().take(limit as usize) {
+                let id = song["songmid"].as_str().unwrap_or("");
+                let title = song["songname"].as_str().unwrap_or("Unknown");
+                let artist = song["singer"][0]["name"].as_str().unwrap_or("Unknown");
+
+                let track = Track::qqmusic(id.to_string(), title.to_string(), artist.to_string());
+                tracks.push(track);
+            }
+        }
+
+        Ok(tracks)
+    }
+
+    fn get_song_url_sync(&self, songmid: &str) -> Result<String> {
+        let url = format!(
+            "{}/song/url?id={}&br=128",
+            self.api_base_url.trim_end_matches('/'),
+            songmid
+        );
+
+        let client = reqwest::blocking::Client::new();
+        let response = client.get(&url).send().map_err(|e| {
+            crate::error::MusicError::PlaybackFailed(format!("QQ Music URL fetch failed: {}", e))
+        })?;
+
+        let json: serde_json::Value = response.json().map_err(|e| {
+            crate::error::MusicError::PlaybackFailed(format!("JSON parse failed: {}", e))
+        })?;
+
+        json["data"][0]["url"]
+            .as_str()
+            .ok_or_else(|| {
+                crate::error::MusicError::PlaybackFailed("No song URL found".to_string())
+            })
+            .map(|s| s.to_string())
     }
 }
 
@@ -265,18 +333,68 @@ impl Default for QqMusicSource {
 }
 
 impl MusicSource for QqMusicSource {
-    fn load(&mut self, _track: &Track) -> Result<()> {
+    fn load(&mut self, track: &Track) -> Result<()> {
         self.state = PlaybackState::Loading;
         self.dispatch_event(MusicEvent::StateChanged(
             PlaybackState::Loading,
             Some(PlaybackState::Stopped),
         ));
 
-        // TODO: Implement QQ Music API integration
-        // For now, return an error indicating this is not yet implemented
-        Err(crate::error::MusicError::PlaybackFailed(
-            "QQ Music API integration not yet implemented".to_string(),
-        ))
+        self.initialize_audio_output()?;
+
+        let song_id = track.id.clone();
+        log::info!("[QQ Music] Loading song: {}", track.title);
+
+        let audio_url = match self.get_song_url_sync(&song_id) {
+            Ok(url) => url,
+            Err(e) => {
+                log::error!("[QQ Music] Failed to get song URL: {:?}", e);
+                self.state = PlaybackState::Stopped;
+                return Err(e);
+            }
+        };
+
+        self.current_audio_url = Some(audio_url.clone());
+        log::info!("[QQ Music] Got audio URL: {}", audio_url);
+
+        let handle = self
+            .stream_handle
+            .as_ref()
+            .ok_or_else(|| crate::error::MusicError::Io("No audio output handle".to_string()))?;
+
+        let client = reqwest::blocking::Client::new();
+        let response = client.get(&audio_url).send().map_err(|e| {
+            crate::error::MusicError::PlaybackFailed(format!("HTTP request failed: {}", e))
+        })?;
+
+        let bytes = response
+            .bytes()
+            .map_err(|e| crate::error::MusicError::PlaybackFailed(e.to_string()))?;
+
+        log::info!("[QQ Music] Downloaded {} bytes", bytes.len());
+
+        let cursor = std::io::Cursor::new(bytes.to_vec());
+        let source = rodio::Decoder::new(std::io::BufReader::new(cursor)).map_err(
+            |e: rodio::decoder::DecoderError| {
+                crate::error::MusicError::PlaybackFailed(e.to_string())
+            },
+        )?;
+
+        let sink = rodio::Sink::try_new(handle)
+            .map_err(|e| crate::error::MusicError::PlaybackFailed(e.to_string()))?;
+
+        sink.append(source);
+        sink.pause();
+
+        self.rodio_sink = Some(Arc::new(Mutex::new(sink)));
+        self.state = PlaybackState::Stopped;
+        self.position = Duration::default();
+        self.duration = track.duration;
+
+        self.dispatch_event(MusicEvent::TrackChanged(track.clone()));
+
+        log::info!("[QQ Music] Song loaded successfully: {}", track.title);
+        Ok(())
     }
 
     fn play(&mut self) -> Result<()> {
@@ -344,9 +462,18 @@ impl MusicSource for QqMusicSource {
         None
     }
 
-    fn search(&self, _query: &str) -> Result<Vec<Track>> {
-        // TODO: Implement QQ Music search API
-        Ok(Vec::new())
+    fn search(&self, query: &str) -> Result<Vec<Track>> {
+        log::info!("[QQ Music] Searching for: {}", query);
+        match self.search_qq_music_sync(query, 20) {
+            Ok(tracks) => {
+                log::info!("[QQ Music] Found {} tracks", tracks.len());
+                Ok(tracks)
+            }
+            Err(e) => {
+                log::error!("[QQ Music] Search failed: {:?}", e);
+                Ok(Vec::new())
+            }
+        }
     }
 
     fn get_source_type(&self) -> SourceType {

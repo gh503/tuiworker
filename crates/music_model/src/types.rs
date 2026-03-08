@@ -226,4 +226,19 @@ impl Track {
             lyrics: None,
         }
     }
+
+    pub fn qqmusic(id: String, title: String, artist: String) -> Self {
+        Self {
+            id: id.clone(),
+            path: PathBuf::from(format!("qqmusic:{}", id)),
+            title,
+            artist,
+            album: String::from("-"),
+            duration: None,
+            source_type: SourceType::QqMusic,
+            cover_url: None,
+            parent: String::from("QQ Music"),
+            lyrics: None,
+        }
+    }
 }

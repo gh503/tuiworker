@@ -248,13 +248,11 @@ impl MusicModule {
                 self.controller.get_queue().len()
             );
         } else if is_netease {
-            log::info!(
-                "[Music] NetEase Music selected. Search functionality is not yet implemented."
-            );
-            log::info!("[Music] To use NetEase Music, you need to enable it in config: ~/.config/tuiworker/music.toml");
+            log::info!("[Music] NetEase Music selected. API integration is implemented.");
+            log::info!("[Music] Tip: Use '/' to search for music.");
         } else if is_qq {
-            log::info!("[Music] QQ Music selected. Search functionality is not yet implemented.");
-            log::info!("[Music] Reference: QQMusicApi at /home/gh503/Code/QQMusicApi");
+            log::info!("[Music] QQ Music selected. API integration is implemented.");
+            log::info!("[Music] Tip: Use '/' to search for music.");
         }
     }
 
