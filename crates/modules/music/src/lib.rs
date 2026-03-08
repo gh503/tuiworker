@@ -467,8 +467,6 @@ impl MusicModule {
             lines.push(Line::from("没有正在播放的曲目"));
         }
 
-        lines.push(Line::default());
-
         let playback_status = match state {
             PlaybackState::Playing => "播放中",
             PlaybackState::Paused => "已暂停",
@@ -489,25 +487,25 @@ impl MusicModule {
             mode
         );
 
-        lines.push(Line::from(vec![
-            Span::styled("源: ", Style::default().fg(self.theme.muted())),
-            Span::styled(source_name, Style::default().fg(self.theme.primary())),
-            Span::styled("  状态: ", Style::default().fg(self.theme.muted())),
-            Span::styled(playback_status, Style::default()),
-        ]));
+        let mode_text = match mode {
+            PlaybackMode::Sequential => "顺序",
+            PlaybackMode::Random => "随机",
+            PlaybackMode::RepeatOne => "单曲循环",
+            PlaybackMode::RepeatAll => "列表循环",
+        };
 
         lines.push(Line::from(vec![
-            Span::styled(format!("音量: {:.0}%", volume * 100.0), Style::default()),
-            Span::styled("  |  ", Style::default()),
+            Span::styled("源:", Style::default().fg(self.theme.muted())),
+            Span::styled(source_name, Style::default().fg(self.theme.primary())),
+            Span::styled(" 状态:", Style::default().fg(self.theme.muted())),
+            Span::styled(playback_status, Style::default()),
+            Span::styled(" 音量:", Style::default().fg(self.theme.muted())),
             Span::styled(
-                match mode {
-                    PlaybackMode::Sequential => "顺序",
-                    PlaybackMode::Random => "随机",
-                    PlaybackMode::RepeatOne => "单曲循环",
-                    PlaybackMode::RepeatAll => "列表循环",
-                },
-                Style::default(),
+                format!("{:.0}%", volume * 100.0),
+                Style::default().fg(Color::White),
             ),
+            Span::styled(" 模式:", Style::default().fg(self.theme.muted())),
+            Span::styled(mode_text, Style::default().fg(Color::White)),
         ]));
 
         let paragraph = Paragraph::new(Text::from(lines))
@@ -517,7 +515,7 @@ impl MusicModule {
                     .borders(Borders::ALL)
                     .border_style(self.theme.border()),
             )
-            .wrap(Wrap { trim: false });
+            .wrap(Wrap { trim: true });
 
         frame.render_widget(paragraph, area);
     }
@@ -655,7 +653,7 @@ impl CoreModule for MusicModule {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(4),
+                Constraint::Length(3),
                 Constraint::Min(8),
                 Constraint::Min(10),
                 Constraint::Length(3),
