@@ -479,17 +479,25 @@ impl MusicModule {
 
         let mode = self.controller.get_queue().get_mode();
         let source_name = self.get_source_name();
+        let volume = self.controller.get_volume();
+
+        log::debug!(
+            "[Music] Display: source={}, state={}, volume={:.0}%, mode={:?}",
+            source_name,
+            playback_status,
+            volume * 100.0,
+            mode
+        );
 
         lines.push(Line::from(vec![
             Span::styled("源: ", Style::default().fg(self.theme.muted())),
             Span::styled(source_name, Style::default().fg(self.theme.primary())),
             Span::styled("  状态: ", Style::default().fg(self.theme.muted())),
             Span::styled(playback_status, Style::default()),
-            Span::styled("  |  ", Style::default()),
-            Span::styled(
-                format!("音量: {:.0}%", self.controller.get_volume() * 100.0),
-                Style::default(),
-            ),
+        ]));
+
+        lines.push(Line::from(vec![
+            Span::styled(format!("音量: {:.0}%", volume * 100.0), Style::default()),
             Span::styled("  |  ", Style::default()),
             Span::styled(
                 match mode {
@@ -509,7 +517,7 @@ impl MusicModule {
                     .borders(Borders::ALL)
                     .border_style(self.theme.border()),
             )
-            .wrap(Wrap { trim: true });
+            .wrap(Wrap { trim: false });
 
         frame.render_widget(paragraph, area);
     }
