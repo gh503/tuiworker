@@ -92,8 +92,18 @@ impl LrcParser {
     /// [mm:ss.ms] Lyric text
     /// [mm:ss.ms] Translation text (if tagged with tlyric)
     ///
+    /// Metadata tags (ignored):
+    /// [ver:v1.0] Version
+    /// [ar:Artist] Artist name
+    /// [ti:Title] Song title
+    /// [by:Editor] Editor name
+    /// [offset:100] Time offset (in milliseconds)
+    ///
     /// Example (LRC format):
     /// ```text
+    /// [ver:v1.0]
+    /// [ar:Artist]
+    /// [ti:Title]
     /// [00:00.00] First line
     /// [00:01.50] Second line
     /// ```
@@ -101,11 +111,24 @@ impl LrcParser {
         let mut lyrics = Lyrics::new();
 
         for line in lrc_text.lines() {
-            if line.trim().is_empty() || !line.starts_with('[') {
+            let trimmed = line.trim();
+
+            if trimmed.is_empty() || !trimmed.starts_with('[') {
                 continue;
             }
 
             if let Some((time_str, text)) = Self::parse_line(line) {
+                // Skip metadata tags - only parse lines with valid time format
+                // Valid time format: MM:SS or MM:SS.ms or MM:SS:ms
+                if !Self::is_valid_time_format(&time_str) {
+                    // This is a metadata tag like [ver:v1.0], [ar:Artist], etc.
+                    // Store in metadata map
+                    if let Some((key, value)) = Self::parse_metadata_tag(&time_str) {
+                        lyrics.metadata.insert(key, value);
+                    }
+                    continue;
+                }
+
                 let time = Self::parse_time(&time_str)?;
                 let lyric_line = LyricLine::new(time, text);
                 lyrics.lines.push(lyric_line);
@@ -121,6 +144,45 @@ impl LrcParser {
             .sort_by(|a, b| a.time.partial_cmp(&b.time).unwrap());
 
         Ok(lyrics)
+    }
+
+    /// Check if time string has valid format [MM:SS.ms] or [MM:SS]
+    fn is_valid_time_format(time_str: &str) -> bool {
+        let clean_time = time_str.trim();
+        let parts: Vec<&str> = clean_time.split(':').collect();
+
+        // Must have 2 or 3 parts (MM, SS, and optionally MS)
+        if parts.len() < 2 || parts.len() > 3 {
+            return false;
+        }
+
+        // First part (minutes) must be numeric
+        if parts[0].parse::<u32>().is_err() {
+            return false;
+        }
+
+        // Second part (seconds) must be numeric or numeric.ms
+        let seconds_parts: Vec<&str> = parts[1].split('.').collect();
+        if seconds_parts[0].parse::<u32>().is_err() {
+            return false;
+        }
+
+        // If there's milliseconds, it must be numeric
+        if seconds_parts.len() > 1 && seconds_parts[1].parse::<u32>().is_err() {
+            return false;
+        }
+
+        true
+    }
+
+    /// Parse metadata tag like "ver:v1.0" or "ar:Artist"
+    fn parse_metadata_tag(tag_str: &str) -> Option<(String, String)> {
+        let parts: Vec<&str> = tag_str.split(':').collect();
+        if parts.len() == 2 {
+            Some((parts[0].trim().to_string(), parts[1].trim().to_string()))
+        } else {
+            None
+        }
     }
 
     /// Parse a single LRC line
