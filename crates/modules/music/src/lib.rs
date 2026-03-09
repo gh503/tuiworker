@@ -220,6 +220,9 @@ impl MusicModule {
     pub fn switch_source(&mut self) {
         let old_source = self.get_source_name().to_string();
 
+        self.controller.clear_queue();
+        self.selected_index = 0;
+
         self.current_source = match self.current_source {
             SourceType::Local => SourceType::QqMusic,
             SourceType::QqMusic => SourceType::NetEaseMusic,
@@ -227,32 +230,24 @@ impl MusicModule {
             SourceType::Nas { .. } => SourceType::Local,
         };
 
-        let music_dir = self.music_dir.display().to_string();
         let new_source = self.get_source_name();
         log::info!("[Music] Switched from {} to {}", old_source, new_source);
 
-        self.controller.clear_queue();
-        self.selected_index = 0;
-
-        let is_local = matches!(self.current_source, SourceType::Local);
-        let is_netease = matches!(self.current_source, SourceType::NetEaseMusic);
-        let is_qq = matches!(self.current_source, SourceType::QqMusic);
-
-        if is_local {
-            log::info!("[Music] Loading local music from: {}", music_dir);
-            if let Err(e) = self.load_music() {
-                log::error!("[Music] Failed to load music: {}", e);
+        match self.current_source {
+            SourceType::Local => {
+                let music_dir = self.music_dir.display().to_string();
+                log::info!("[Music] Loading local music from: {}", music_dir);
+                if let Err(e) = self.load_music() {
+                    log::error!("[Music] Failed to load music: {}", e);
+                }
             }
-            log::info!(
-                "[Music] Loaded {} tracks",
-                self.controller.get_queue().len()
-            );
-        } else if is_netease {
-            log::info!("[Music] NetEase Music selected. API integration is implemented.");
-            log::info!("[Music] Tip: Use '/' to search for music.");
-        } else if is_qq {
-            log::info!("[Music] QQ Music selected. API integration is implemented.");
-            log::info!("[Music] Tip: Use '/' to search for music.");
+            SourceType::NetEaseMusic | SourceType::QqMusic => {
+                log::info!("[Music] {} music source selected. Use '/' to search for tracks.", new_source);
+                log::info!("[Music] Note: List is empty until you search for music.");
+            }
+           SourceType::Nas { .. } => {
+                log::info!("[Music] NAS source selected. Network storage integration not yet implemented.");
+            }
         }
     }
 
